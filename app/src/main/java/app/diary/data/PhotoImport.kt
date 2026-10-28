@@ -104,6 +104,24 @@ internal object PhotoImport {
         Kind.HEIF, Kind.UNKNOWN -> Failure.UNSUPPORTED
     }
 
+    /**
+     * 文件已经完整落在本地。JPEG、PNG、WebP、GIF 先用 BitmapFactory。
+     * vivo（API 28+）上 ImageDecoder 的软件位图经常是 RGBA_F16、Display P3 或带增益图，
+     * 再压成 JPEG 会变成黑图。HEIC 只能交给 ImageDecoder。
+     */
+    fun bitmapFactoryFirst(kind: Kind): Boolean = kind != Kind.HEIF
+
+    /**
+     * 只有普通的 sRGB ARGB_8888、且没有增益图，才能直接交给 JPEG 编码和 Compose。
+     * 硬件位图、RGBA_F16、广色域、Ultra HDR 增益图在 vivo 上会画成黑块。
+     */
+    fun needsSrgbBake(configName: String?, isSrgb: Boolean, hasGainmap: Boolean): Boolean {
+        if (hasGainmap) return true
+        if (configName != "ARGB_8888") return true
+        if (!isSrgb) return true
+        return false
+    }
+
     fun message(failure: Failure, kind: Kind = Kind.UNKNOWN): String = when (failure) {
         Failure.PERMISSION -> "没有读取这张图片的权限"
         Failure.UNREADABLE -> "这张图片没有读出来"

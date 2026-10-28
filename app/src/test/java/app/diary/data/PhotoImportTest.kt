@@ -1,6 +1,8 @@
 package app.diary.data
 
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class PhotoImportTest {
@@ -54,6 +56,25 @@ class PhotoImportTest {
         assertEquals(270, PhotoImport.degrees(8))
         assertEquals(270, PhotoImport.degrees(7))
         assertEquals(0, PhotoImport.degrees(1))
+    }
+
+    @Test
+    fun jpegFromAlbumOrCameraStaysOnBitmapFactoryAndPlainSrgb() {
+        val jpeg = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE1.toByte(), 0x00, 0x00)
+        assertEquals(PhotoImport.Kind.JPEG, PhotoImport.kindOf(jpeg))
+        assertTrue(PhotoImport.bitmapFactoryFirst(PhotoImport.Kind.JPEG))
+        assertTrue(PhotoImport.bitmapFactoryFirst(PhotoImport.Kind.PNG))
+        assertTrue(PhotoImport.bitmapFactoryFirst(PhotoImport.Kind.WEBP))
+        assertTrue(PhotoImport.bitmapFactoryFirst(PhotoImport.Kind.GIF))
+        assertTrue(PhotoImport.bitmapFactoryFirst(PhotoImport.Kind.UNKNOWN))
+        assertFalse(PhotoImport.bitmapFactoryFirst(PhotoImport.Kind.HEIF))
+        assertTrue(PhotoImport.needsSrgbBake("HARDWARE", isSrgb = true, hasGainmap = false))
+        assertTrue(PhotoImport.needsSrgbBake("RGBA_F16", isSrgb = true, hasGainmap = false))
+        assertTrue(PhotoImport.needsSrgbBake("RGB_565", isSrgb = true, hasGainmap = false))
+        assertTrue(PhotoImport.needsSrgbBake(null, isSrgb = false, hasGainmap = false))
+        assertTrue(PhotoImport.needsSrgbBake("ARGB_8888", isSrgb = false, hasGainmap = false))
+        assertTrue(PhotoImport.needsSrgbBake("ARGB_8888", isSrgb = true, hasGainmap = true))
+        assertFalse(PhotoImport.needsSrgbBake("ARGB_8888", isSrgb = true, hasGainmap = false))
     }
 
     @Test

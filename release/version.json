@@ -1,6 +1,6 @@
 {
-  "versionCode": 5,
-  "versionName": "1.1.1",
+  "versionCode": 6,
+  "versionName": "1.1.2",
   "apkUrl": "https://raw.githubusercontent.com/lulukdog/diary-android/main/release/diary.apk",
-  "changelog": "从相册添加照片可以读入 JPEG、PNG、WebP 和 HEIC。读不到时会说明是没有权限，还是格式不支持。"
+  "changelog": "照片可以正常显示，点一下能放大。如果还是黑的，删掉这张后重新添加一次。"
 }
