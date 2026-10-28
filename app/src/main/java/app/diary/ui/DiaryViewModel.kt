@@ -1,5 +1,6 @@
 package app.diary.ui
 
+import android.content.Context
 import android.net.Uri
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -65,19 +66,27 @@ abstract class DraftViewModel(
         }
     }
 
-    fun attach(uri: Uri, deleteAfter: File?) {
+    fun attach(context: Context, uri: Uri, deleteAfter: File?) {
         if (pending.size >= 9) {
+            deleteAfter?.delete()
             message = "一则日记最多 9 张图片"
+            return
+        }
+        val stream = try {
+            photos.open(context, uri)
+        } catch (error: Exception) {
+            deleteAfter?.delete()
+            message = error.message ?: "这张图片没有读出来"
             return
         }
         importing = true
         viewModelScope.launch {
             try {
-                val context = photoContext()
                 val name = withContext(Dispatchers.IO) {
                     try {
-                        photos.import(context, uri)
+                        photos.importStream(stream)
                     } finally {
+                        runCatching { stream.close() }
                         deleteAfter?.delete()
                     }
                 }
@@ -94,8 +103,6 @@ abstract class DraftViewModel(
             }
         }
     }
-
-    protected abstract fun photoContext(): android.content.Context
 
     protected fun keepImportedFiles() {
         keepFiles = true

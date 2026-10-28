@@ -1,6 +1,5 @@
 package app.diary.ui
 
-import android.content.Context
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -17,6 +16,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewModelScope
 import app.diary.data.DiaryRepository
@@ -25,7 +25,6 @@ import app.diary.data.PhotoStore
 import kotlinx.coroutines.launch
 
 class EditEntryViewModel(
-    private val appContext: Context,
     private val repository: DiaryRepository,
     private val photos: PhotoStore,
     private val entryId: Long,
@@ -52,8 +51,6 @@ class EditEntryViewModel(
             }
         }
     }
-
-    override fun photoContext(): Context = appContext
 
     fun save(onDone: () -> Unit) {
         if (!loaded.value) return
@@ -82,11 +79,12 @@ class EditEntryViewModel(
 @Composable
 fun EditScreen(entryId: Long, onBack: () -> Unit) {
     val viewModel = diaryViewModel(key = "edit-$entryId") { container ->
-        EditEntryViewModel(container.appContext, container.repository, container.photos, entryId)
+        EditEntryViewModel(container.repository, container.photos, entryId)
     }
     val host = rememberMessageHost(viewModel.message) { viewModel.consumeMessage() }
+    val context = LocalContext.current
     val photos = rememberPhotoActions(
-        onPicked = { uri, file -> viewModel.attach(uri, file) },
+        onPicked = { uri, file -> viewModel.attach(context, uri, file) },
         onMessage = { viewModel.message = it },
     )
     MessageLayer(host) {

@@ -1,11 +1,14 @@
 package app.diary.ui
 
 import android.Manifest
+import android.app.Activity
 import android.content.Context
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContract
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -138,7 +141,7 @@ fun rememberPhotoActions(onPicked: (Uri, File?) -> Unit, onMessage: (String) -> 
             file?.delete()
         }
     }
-    val pick = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri ->
+    val pick = rememberLauncherForActivityResult(OpenAlbumImage()) { uri ->
         if (uri != null) onPicked(uri, null)
     }
     fun launchCamera() {
@@ -158,6 +161,28 @@ fun rememberPhotoActions(onPicked: (Uri, File?) -> Unit, onMessage: (String) -> 
         },
         pickFromGallery = { pick.launch("image/*") },
     )
+}
+
+private class OpenAlbumImage : ActivityResultContract<String, Uri?>() {
+    override fun createIntent(context: Context, input: String): Intent {
+        return Intent(Intent.ACTION_GET_CONTENT)
+            .addCategory(Intent.CATEGORY_OPENABLE)
+            .setType(input)
+            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }
+
+    override fun parseResult(resultCode: Int, intent: Intent?): Uri? {
+        if (resultCode != Activity.RESULT_OK || intent == null) return null
+        intent.data?.let { return it }
+        val clip = intent.clipData
+        if (clip != null && clip.itemCount > 0) {
+            clip.getItemAt(0)?.uri?.let { return it }
+        }
+        return runCatching {
+            @Suppress("DEPRECATION")
+            intent.getParcelableExtra<Uri>(Intent.EXTRA_STREAM)
+        }.getOrNull()
+    }
 }
 
 private fun createCameraFile(context: Context): File {
