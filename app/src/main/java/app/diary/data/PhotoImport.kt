@@ -19,6 +19,7 @@ internal object PhotoImport {
         DECODE,
         TOO_BIG,
         SAVE,
+        BLANK,
     }
 
     fun kindOf(header: ByteArray): Kind {
@@ -104,22 +105,52 @@ internal object PhotoImport {
         Kind.HEIF, Kind.UNKNOWN -> Failure.UNSUPPORTED
     }
 
-    /**
-     * 文件已经完整落在本地。JPEG、PNG、WebP、GIF 先用 BitmapFactory。
-     * vivo（API 28+）上 ImageDecoder 的软件位图经常是 RGBA_F16、Display P3 或带增益图，
-     * 再压成 JPEG 会变成黑图。HEIC 只能交给 ImageDecoder。
-     */
-    fun bitmapFactoryFirst(kind: Kind): Boolean = kind != Kind.HEIF
+    enum class Source { FACTORY, DECODER, THUMBNAIL }
 
     /**
-     * 只有普通的 sRGB ARGB_8888、且没有增益图，才能直接交给 JPEG 编码和 Compose。
-     * 硬件位图、RGBA_F16、广色域、Ultra HDR 增益图在 vivo 上会画成黑块。
+     * 一种解码给出的位图可能尺寸对、像素却是空的。JPEG 先走 BitmapFactory，
+     * 不行再换 ImageDecoder，最后用系统缩略图。HEIC 只能先试 ImageDecoder。
      */
-    fun needsSrgbBake(configName: String?, isSrgb: Boolean, hasGainmap: Boolean): Boolean {
-        if (hasGainmap) return true
-        if (configName != "ARGB_8888") return true
-        if (!isSrgb) return true
-        return false
+    fun sourceOrder(kind: Kind): List<Source> = when (kind) {
+        Kind.HEIF -> listOf(Source.DECODER, Source.FACTORY, Source.THUMBNAIL)
+        else -> listOf(Source.FACTORY, Source.DECODER, Source.THUMBNAIL)
+    }
+
+    /** 采样点全都几乎是黑的，就当成没读出内容。夜里的照片仍会有亮一点的像素。 */
+    fun isNearlyBlank(samples: IntArray): Boolean {
+        if (samples.isEmpty()) return true
+        for (color in samples) {
+            val red = (color ushr 16) and 0xFF
+            val green = (color ushr 8) and 0xFF
+            val blue = color and 0xFF
+            if (red > BLANK_CHANNEL || green > BLANK_CHANNEL || blue > BLANK_CHANNEL) return false
+        }
+        return true
+    }
+
+    fun sampleGrid(pixels: IntArray, width: Int, height: Int): IntArray {
+        if (width <= 0 || height <= 0 || pixels.size < width * height) return IntArray(0)
+        val colors = ArrayList<Int>(69)
+        fun add(x: Int, y: Int) {
+            val px = x.coerceIn(0, width - 1)
+            val py = y.coerceIn(0, height - 1)
+            colors.add(pixels[py * width + px])
+        }
+        add(0, 0)
+        add(width - 1, 0)
+        add(0, height - 1)
+        add(width - 1, height - 1)
+        add(width / 2, height / 2)
+        val columns = 8
+        val rows = 8
+        for (row in 0 until rows) {
+            val y = ((row + 0.5f) * height / rows).toInt()
+            for (column in 0 until columns) {
+                val x = ((column + 0.5f) * width / columns).toInt()
+                add(x, y)
+            }
+        }
+        return colors.toIntArray()
     }
 
     fun message(failure: Failure, kind: Kind = Kind.UNKNOWN): String = when (failure) {
@@ -129,6 +160,7 @@ internal object PhotoImport {
         Failure.TOO_BIG -> "图片太大，这台设备内存不够"
         Failure.SAVE -> "图片没有保存成功"
         Failure.DECODE -> "这张图片没有读出来"
+        Failure.BLANK -> "这张图片读出来是黑的，请换一张或重试"
         Failure.UNSUPPORTED -> when (kind) {
             Kind.HEIF -> "这张是 HEIC，这台设备解不了"
             else -> "这种图片格式暂时读不了"
@@ -165,6 +197,8 @@ internal object PhotoImport {
         "heic", "heix", "hevc", "hevx", "heim", "heis", "heif", "mif1", "msf1",
     )
     private val HEIF_COMPAT = setOf("heic", "heix", "hevc", "hevx", "heim", "heis", "heif")
+
+    private const val BLANK_CHANNEL = 8
 }
 
 internal class PhotoImportException(
