@@ -31,7 +31,6 @@ fun DayScreen(
     }
     val viewModel = diaryViewModel(key = "writer-$dayKey") { container ->
         DayWriterViewModel(
-            container.appContext,
             container.repository,
             container.photos,
             container.journal,

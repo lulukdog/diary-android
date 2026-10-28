@@ -1,6 +1,5 @@
 package app.diary.ui
 
-import android.content.Context
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Icon
@@ -28,6 +27,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewModelScope
@@ -54,7 +54,6 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 class DayWriterViewModel(
-    private val appContext: Context,
     private val repository: DiaryRepository,
     private val photos: PhotoStore,
     private val journal: JournalRepository,
@@ -92,8 +91,6 @@ class DayWriterViewModel(
             }
         }
     }
-
-    override fun photoContext(): Context = appContext
 
     fun refresh() {
         connected = journal.configured()
@@ -263,7 +260,6 @@ fun TodayScreen(onOpenSummary: (String) -> Unit, onEdit: (Long) -> Unit) {
     val dayKey = DayClock.dayKey()
     val viewModel = diaryViewModel(key = "writer-$dayKey") { container ->
         DayWriterViewModel(
-            container.appContext,
             container.repository,
             container.photos,
             container.journal,
@@ -303,8 +299,9 @@ fun WriterPage(
     val unsynced = entries.any { !it.entry.cached && !it.entry.synced }
     val host = rememberMessageHost(viewModel.message) { viewModel.consumeMessage() }
     var pendingDelete by remember { mutableStateOf<Long?>(null) }
+    val context = LocalContext.current
     val photos = rememberPhotoActions(
-        onPicked = { uri, file -> viewModel.attach(uri, file) },
+        onPicked = { uri, file -> viewModel.attach(context, uri, file) },
         onMessage = { viewModel.message = it },
     )
     if (pendingDelete != null) {
