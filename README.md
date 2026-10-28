@@ -71,8 +71,8 @@ chmod +x scripts/build-release.sh
 
 ```json
 {
-  "versionCode": 2,
-  "versionName": "1.0.1",
+  "versionCode": 3,
+  "versionName": "1.0.2",
   "apkUrl": "https://raw.githubusercontent.com/lulukdog/diary-android/main/release/diary.apk",
   "changelog": "这一版改了什么"
 }

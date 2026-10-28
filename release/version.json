@@ -1,6 +1,6 @@
 {
-  "versionCode": 2,
-  "versionName": "1.0.1",
+  "versionCode": 3,
+  "versionName": "1.0.2",
   "apkUrl": "https://raw.githubusercontent.com/lulukdog/diary-android/main/release/diary.apk",
-  "changelog": "设置里点「检查并更新」。没改过地址时，默认读取 GitHub 上的 version.json，确认后下载并安装。"
+  "changelog": "密钥设置改成已保存时只显示编辑；版本号 1.0.2。"
 }

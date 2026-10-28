@@ -70,12 +70,13 @@ class SettingsViewModel(
         message = null
     }
 
-    fun saveApiKey(value: String) {
+    fun saveApiKey(value: String, onSaved: () -> Unit = {}) {
         viewModelScope.launch {
             try {
                 settings.setApiKey(value)
                 hasUserKey = true
                 message = "密钥已保存在这台设备"
+                onSaved()
             } catch (error: Exception) {
                 message = error.message ?: "密钥没有保存"
             }
@@ -183,6 +184,8 @@ fun SettingsScreen(
     }
     var keyInput by remember { mutableStateOf("") }
     var reveal by remember { mutableStateOf(false) }
+    var editingKey by remember { mutableStateOf(false) }
+    val showKeyForm = !viewModel.hasUserKey || editingKey
     var urlInput by remember { mutableStateOf(viewModel.updateUrl) }
     var confirmToken by remember { mutableStateOf(false) }
     if (confirmToken) {
@@ -222,35 +225,55 @@ fun SettingsScreen(
                 QuietCard {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(keyStatus(viewModel), color = MaterialTheme.colorScheme.onSurfaceVariant)
-                        OutlinedTextField(
-                            value = keyInput,
-                            onValueChange = { keyInput = it },
-                            modifier = Modifier.fillMaxWidth(),
-                            singleLine = true,
-                            label = { Text("DeepSeek API Key") },
-                            placeholder = { Text(if (viewModel.hasUserKey) "输入新密钥以替换" else "sk-…") },
-                            visualTransformation = if (reveal) VisualTransformation.None else PasswordVisualTransformation(),
-                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                        )
-                        Row {
-                            TextButton(onClick = { reveal = !reveal }) { Text(if (reveal) "隐藏" else "显示") }
-                            Spacer(Modifier.weight(1f))
-                            if (viewModel.hasUserKey) {
+                        if (viewModel.hasUserKey && !editingKey) {
+                            Row {
+                                TextButton(onClick = {
+                                    keyInput = ""
+                                    reveal = false
+                                    editingKey = true
+                                }) { Text("编辑") }
                                 TextButton(onClick = {
                                     viewModel.clearApiKey()
                                     keyInput = ""
+                                    reveal = false
+                                    editingKey = false
                                 }) { Text("清除") }
                             }
                         }
-                        Button(
-                            onClick = {
-                                viewModel.saveApiKey(keyInput)
-                                keyInput = ""
-                                reveal = false
-                            },
-                            enabled = keyInput.isNotBlank(),
-                            modifier = Modifier.fillMaxWidth(),
-                        ) { Text("保存密钥") }
+                        if (showKeyForm) {
+                            OutlinedTextField(
+                                value = keyInput,
+                                onValueChange = { keyInput = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                label = { Text("DeepSeek API Key") },
+                                placeholder = { Text(if (viewModel.hasUserKey) "输入新密钥以替换" else "sk-…") },
+                                visualTransformation = if (reveal) VisualTransformation.None else PasswordVisualTransformation(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            )
+                            Row {
+                                TextButton(onClick = { reveal = !reveal }) { Text(if (reveal) "隐藏" else "显示") }
+                                Spacer(Modifier.weight(1f))
+                                if (editingKey) {
+                                    TextButton(onClick = {
+                                        keyInput = ""
+                                        reveal = false
+                                        editingKey = false
+                                    }) { Text("取消") }
+                                }
+                            }
+                            Button(
+                                onClick = {
+                                    viewModel.saveApiKey(keyInput) {
+                                        keyInput = ""
+                                        reveal = false
+                                        editingKey = false
+                                    }
+                                },
+                                enabled = keyInput.isNotBlank(),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text("保存密钥") }
+                        }
                         Text(
                             "密钥只放在这台手机的加密存储里，不会写进日记正文。构建时如果提供了环境变量 DEEPSEEK_API_KEY，且这里还没保存过，会用那个值。界面不显示密钥本身。",
                             style = MaterialTheme.typography.bodySmall,
@@ -265,7 +288,7 @@ fun SettingsScreen(
                 QuietCard {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                         Text(
-                            "当前版本 ${BuildConfig.VERSION_NAME}（${BuildConfig.VERSION_CODE}）",
+                            "当前版本 ${BuildConfig.VERSION_NAME}",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         OutlinedTextField(
@@ -353,7 +376,7 @@ fun SettingsScreen(
                 Spacer(Modifier.height(8.dp))
                 QuietCard {
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Text("日记", style = MaterialTheme.typography.titleMedium)
+                        Text("日记 ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleMedium)
                         Text(
                             "一天按北京时间（Asia/Shanghai）切开，不按手机时区。正文、图片和密钥都在这台手机上。卸载或清除数据会删掉日记，需要副本时先导出。",
                             style = MaterialTheme.typography.bodyMedium,
@@ -376,7 +399,7 @@ private fun SectionTitle(text: String) {
 }
 
 private fun keyStatus(viewModel: SettingsViewModel): String = when {
-    viewModel.hasUserKey -> "已保存在这台设备的加密存储里。"
+    viewModel.hasUserKey -> "已保存在这台设备。"
     viewModel.hasBuildKey -> "还没在这里保存。当前会使用构建时注入的密钥，界面不显示它。"
     else -> "还没有密钥。没有它也可以写日记，只是不能生成摘要。"
 }
