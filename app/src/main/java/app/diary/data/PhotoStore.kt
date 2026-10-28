@@ -115,7 +115,7 @@ class PhotoStore(context: Context) {
     }
 
     private fun write(bitmap: Bitmap): String {
-        val software = ensureSoftware(bitmap)
+        val software = PhotoBitmaps.bake(bitmap)
         val name = UUID.randomUUID().toString() + ".jpg"
         try {
             FileOutputStream(file(name)).use { output ->
@@ -134,15 +134,20 @@ class PhotoStore(context: Context) {
 
     private fun decodeFile(file: File): Bitmap {
         val kind = file.inputStream().use { PhotoImport.kindOf(PhotoImport.readPrefix(it)) }
-        val decoded = if (Build.VERSION.SDK_INT >= 28) {
-            runCatching { decodeWithImageDecoder(file) }.getOrNull()
+        val decoded = if (PhotoImport.bitmapFactoryFirst(kind)) {
+            decodeWithBitmapFactory(file) ?: decodeWithImageDecoderOrNull(file)
         } else {
-            null
-        } ?: decodeWithBitmapFactory(file)
+            decodeWithImageDecoderOrNull(file) ?: decodeWithBitmapFactory(file)
+        }
         if (decoded == null) {
             throw PhotoImportException(PhotoImport.failureForDecode(kind), kind)
         }
         return decoded
+    }
+
+    private fun decodeWithImageDecoderOrNull(file: File): Bitmap? {
+        if (Build.VERSION.SDK_INT < 28) return null
+        return runCatching { decodeWithImageDecoder(file) }.getOrNull()
     }
 
     @RequiresApi(28)
@@ -158,7 +163,7 @@ class PhotoStore(context: Context) {
                 decoder.setTargetSize(targetWidth, targetHeight)
             }
         }
-        return scaleDown(ensureSoftware(bitmap))
+        return prepare(bitmap, degrees = 0)
     }
 
     private fun decodeWithBitmapFactory(file: File): Bitmap? {
@@ -170,11 +175,18 @@ class PhotoStore(context: Context) {
         val options = BitmapFactory.Options().apply {
             inSampleSize = PhotoImport.sampleSize(bounds.outWidth, bounds.outHeight)
             inPreferredConfig = Bitmap.Config.ARGB_8888
+            inMutable = true
+            inScaled = false
         }
         val decoded = FileInputStream(file).use { input ->
             BitmapFactory.decodeFileDescriptor(input.fd, null, options)
         } ?: return null
-        return scaleDown(rotate(decoded, readDegrees(file)))
+        return prepare(decoded, readDegrees(file))
+    }
+
+    private fun prepare(bitmap: Bitmap, degrees: Int): Bitmap {
+        val baked = PhotoBitmaps.bake(bitmap)
+        return PhotoBitmaps.bake(scaleDown(rotate(baked, degrees)))
     }
 
     private fun readDegrees(file: File): Int {
@@ -207,13 +219,6 @@ class PhotoStore(context: Context) {
         )
         if (scaled != source) source.recycle()
         return scaled
-    }
-
-    private fun ensureSoftware(source: Bitmap): Bitmap {
-        if (source.config != Bitmap.Config.HARDWARE) return source
-        val copy = source.copy(Bitmap.Config.ARGB_8888, false)
-        source.recycle()
-        return copy ?: throw PhotoImportException(PhotoImport.Failure.DECODE)
     }
 
     private fun openStream(resolver: ContentResolver, uri: Uri): InputStream {
