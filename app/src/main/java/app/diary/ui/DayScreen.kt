@@ -30,14 +30,21 @@ fun DayScreen(
         return
     }
     val viewModel = diaryViewModel(key = "writer-$dayKey") { container ->
-        DayWriterViewModel(container.appContext, container.repository, container.photos, dayKey)
+        DayWriterViewModel(
+            container.appContext,
+            container.repository,
+            container.photos,
+            container.journal,
+            container.journalSync,
+            dayKey,
+        )
     }
     WriterPage(
         title = if (DayClock.isToday(dayKey)) "今天" else DayClock.formatDay(dayKey),
         subtitle = if (DayClock.isToday(dayKey)) {
-            "${DayClock.formatDay(dayKey)} · 北京时间"
+            "${DayClock.formatDay(dayKey)} · 凌晨 4 点后算新的一天"
         } else {
-            "补记也会归到这一天"
+            "补记留在这一天。连上日记本时，新的一句会按它现在的时间归天。"
         },
         saveLabel = if (DayClock.isToday(dayKey)) "记下" else "补记",
         emptyText = "这一天还是空的。",

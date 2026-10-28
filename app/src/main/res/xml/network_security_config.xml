@@ -1,5 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 允许 http，方便把更新清单放在自己的局域网。DeepSeek 仍走 https。 -->
+<!--
+  明文 HTTP 是故意放开的。
+  日记本在 http://39.96.68.27:10002。Network Security Config 的 domain
+  匹配不了裸 IP，所以不能只写一条 domain-config，要用 base-config 放行。
+  局域网自建的更新清单也可以用 http。DeepSeek 仍走 https。
+-->
 <network-security-config>
     <base-config cleartextTrafficPermitted="true">
         <trust-anchors>

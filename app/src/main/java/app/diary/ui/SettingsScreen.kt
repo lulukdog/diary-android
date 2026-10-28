@@ -41,6 +41,12 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import app.diary.BuildConfig
 import app.diary.export.DiaryExporter
+import app.diary.journal.JournalLink
+import app.diary.journal.JournalRepository
+import app.diary.journal.JournalSync
+import app.diary.journal.JournalUrls
+import app.diary.journal.SyncPhase
+import app.diary.journal.line
 import app.diary.localapi.LocalDiaryServer
 import app.diary.settings.AppSettings
 import kotlinx.coroutines.Dispatchers
@@ -52,6 +58,8 @@ class SettingsViewModel(
     private val settings: AppSettings,
     private val exporter: DiaryExporter,
     private val localServer: LocalDiaryServer,
+    private val journal: JournalRepository,
+    private val sync: JournalSync,
 ) : ViewModel() {
     var hasUserKey by mutableStateOf(settings.hasUserKey())
         private set
@@ -64,7 +72,21 @@ class SettingsViewModel(
         private set
     var exporting by mutableStateOf(false)
         private set
+    var journalUrl by mutableStateOf(settings.journalBaseUrl())
+        private set
+    var hasJournalToken by mutableStateOf(settings.hasJournalToken())
+        private set
+    var checkingJournal by mutableStateOf(false)
+        private set
+    var uploadPhase by mutableStateOf<SyncPhase>(SyncPhase.Idle)
+        private set
     var message by mutableStateOf<String?>(null)
+
+    init {
+        viewModelScope.launch {
+            sync.status.collect { uploadPhase = it }
+        }
+    }
 
     fun consumeMessage() {
         message = null
@@ -87,6 +109,59 @@ class SettingsViewModel(
         settings.clearApiKey()
         hasUserKey = false
         message = if (settings.hasBuildKey()) "已清除设备上的密钥，将使用构建时注入的密钥" else "已清除密钥"
+    }
+
+    fun saveJournalUrl(value: String) {
+        try {
+            settings.setJournalBaseUrl(value)
+            journalUrl = settings.journalBaseUrl()
+            message = if (value.isBlank()) "已恢复为日记本的默认地址" else "日记本地址已保存"
+        } catch (error: Exception) {
+            message = error.message ?: "地址没有保存"
+        }
+    }
+
+    fun saveJournalToken(value: String, onSaved: () -> Unit = {}) {
+        viewModelScope.launch {
+            try {
+                settings.setJournalToken(value)
+                hasJournalToken = true
+                message = "口令已保存在这台设备。正在把手机上还没同步的日记记到日记本。"
+                onSaved()
+                sync.start(announceIfEmpty = true)
+            } catch (error: Exception) {
+                message = error.message ?: "口令没有保存"
+            }
+        }
+    }
+
+    fun clearJournalToken() {
+        sync.cancel()
+        settings.clearJournalToken()
+        hasJournalToken = false
+        message = "已清除日记本口令。这台手机上的日记还在。"
+    }
+
+    fun uploadLocalDiary() {
+        sync.start(announceIfEmpty = true)
+    }
+
+    fun checkJournal() {
+        if (checkingJournal) return
+        checkingJournal = true
+        viewModelScope.launch {
+            try {
+                val result = withContext(Dispatchers.IO) { journal.check() }
+                message = when (result) {
+                    JournalLink.Ready -> "日记本已连上"
+                    JournalLink.MissingToken -> "先保存口令"
+                    JournalLink.Rejected -> "口令不对，日记本没有放行"
+                    is JournalLink.Failed -> result.message
+                }
+            } finally {
+                checkingJournal = false
+            }
+        }
     }
 
     fun saveUpdateUrl(value: String) {
@@ -169,7 +244,14 @@ fun SettingsScreen(
     onNoticeConsumed: () -> Unit,
 ) {
     val viewModel = diaryViewModel { container ->
-        SettingsViewModel(container.appContext, container.settings, container.exporter, container.localServer)
+        SettingsViewModel(
+            container.appContext,
+            container.settings,
+            container.exporter,
+            container.localServer,
+            container.journal,
+            container.journalSync,
+        )
     }
     val host = remember { SnackbarHostState() }
     LaunchedEffect(viewModel.message) {
@@ -182,6 +264,11 @@ fun SettingsScreen(
         host.showSnackbar(text)
         onNoticeConsumed()
     }
+    var journalUrlInput by remember { mutableStateOf(viewModel.journalUrl) }
+    var journalTokenInput by remember { mutableStateOf("") }
+    var revealJournal by remember { mutableStateOf(false) }
+    var editingJournal by remember { mutableStateOf(false) }
+    val showJournalForm = !viewModel.hasJournalToken || editingJournal
     var keyInput by remember { mutableStateOf("") }
     var reveal by remember { mutableStateOf(false) }
     var editingKey by remember { mutableStateOf(false) }
@@ -217,6 +304,100 @@ fun SettingsScreen(
                 Column {
                     Spacer(Modifier.height(18.dp))
                     Text("设置", style = MaterialTheme.typography.headlineLarge)
+                }
+            }
+            DiaryFrame {
+                SectionTitle("日记本")
+                Spacer(Modifier.height(8.dp))
+                QuietCard {
+                    Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text(
+                            if (viewModel.hasJournalToken) "口令已保存在这台设备。" else "还没有口令。没有它也可以在这台手机上写，只是不会同步，也看不到陪伴。",
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                        OutlinedTextField(
+                            value = journalUrlInput,
+                            onValueChange = { journalUrlInput = it },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            label = { Text("日记本地址") },
+                            placeholder = { Text(JournalUrls.DEFAULT_BASE) },
+                        )
+                        TextButton(onClick = {
+                            viewModel.saveJournalUrl(journalUrlInput)
+                            journalUrlInput = viewModel.journalUrl
+                        }) { Text("保存地址") }
+                        if (viewModel.hasJournalToken && !editingJournal) {
+                            Row {
+                                TextButton(onClick = {
+                                    journalTokenInput = ""
+                                    revealJournal = false
+                                    editingJournal = true
+                                }) { Text("编辑口令") }
+                                TextButton(onClick = {
+                                    viewModel.clearJournalToken()
+                                    journalTokenInput = ""
+                                    revealJournal = false
+                                    editingJournal = false
+                                }) { Text("清除口令") }
+                            }
+                        }
+                        if (showJournalForm) {
+                            OutlinedTextField(
+                                value = journalTokenInput,
+                                onValueChange = { journalTokenInput = it },
+                                modifier = Modifier.fillMaxWidth(),
+                                singleLine = true,
+                                label = { Text("日记本口令") },
+                                placeholder = { Text(if (viewModel.hasJournalToken) "输入新口令以替换" else "和网页登录相同") },
+                                visualTransformation = if (revealJournal) VisualTransformation.None else PasswordVisualTransformation(),
+                                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                            )
+                            Row {
+                                TextButton(onClick = { revealJournal = !revealJournal }) {
+                                    Text(if (revealJournal) "隐藏" else "显示")
+                                }
+                                Spacer(Modifier.weight(1f))
+                                if (editingJournal) {
+                                    TextButton(onClick = {
+                                        journalTokenInput = ""
+                                        revealJournal = false
+                                        editingJournal = false
+                                    }) { Text("取消") }
+                                }
+                            }
+                            Button(
+                                onClick = {
+                                    viewModel.saveJournalToken(journalTokenInput) {
+                                        journalTokenInput = ""
+                                        revealJournal = false
+                                        editingJournal = false
+                                    }
+                                },
+                                enabled = journalTokenInput.isNotBlank(),
+                                modifier = Modifier.fillMaxWidth(),
+                            ) { Text("保存口令") }
+                        }
+                        Button(
+                            onClick = viewModel::checkJournal,
+                            enabled = !viewModel.checkingJournal && viewModel.hasJournalToken,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(if (viewModel.checkingJournal) "正在连接…" else "检查连接") }
+                        val uploading = viewModel.uploadPhase is SyncPhase.Running
+                        Button(
+                            onClick = viewModel::uploadLocalDiary,
+                            enabled = viewModel.hasJournalToken && !uploading,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text(if (uploading) "正在上传手机上的日记…" else "把手机上的日记记到日记本") }
+                        viewModel.uploadPhase.line()?.let { line ->
+                            Text(line, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.primary)
+                        }
+                        Text(
+                            "地址空着就用 ${JournalUrls.DEFAULT_BASE}。口令跟网页登录是同一个，只放在这台手机的加密存储里，不会写进安装包。保存口令后，会自动把还没同步的文字和照片传上去；已经记过的不会再传。日记本按现在的时间收下，所以较早的日子在手机上还留着。连上之后，这里显示陪伴和心情。",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        )
+                    }
                 }
             }
             DiaryFrame {
@@ -275,7 +456,7 @@ fun SettingsScreen(
                             ) { Text("保存密钥") }
                         }
                         Text(
-                            "密钥只放在这台手机的加密存储里，不会写进日记正文。构建时如果提供了环境变量 DEEPSEEK_API_KEY，且这里还没保存过，会用那个值。界面不显示密钥本身。",
+                            "密钥只放在这台手机的加密存储里，不会写进日记正文。陪伴优先看日记本上的卡片和「问它」。这里的密钥只用于「当日摘要」。构建时如果提供了环境变量 DEEPSEEK_API_KEY，且这里还没保存过，会用那个值。界面不显示密钥本身。",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )
@@ -378,7 +559,7 @@ fun SettingsScreen(
                     Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                         Text("日记 ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.titleMedium)
                         Text(
-                            "一天按北京时间（Asia/Shanghai）切开，不按手机时区。正文、图片和密钥都在这台手机上。卸载或清除数据会删掉日记，需要副本时先导出。",
+                            "一天从北京时间凌晨 4 点切开，和日记本一致，不按零点，也不按手机时区。连上日记本之后，正文和图片会送到那台服务器。口令和密钥仍只在这台手机的加密存储里。卸载或清除数据会删掉手机上的副本，需要副本时先导出。",
                             style = MaterialTheme.typography.bodyMedium,
                         )
                         Text(

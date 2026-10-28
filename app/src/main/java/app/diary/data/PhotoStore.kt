@@ -33,6 +33,10 @@ class PhotoStore(context: Context) {
         runCatching { file(name).delete() }
     }
 
+    fun writeBytes(name: String, bytes: ByteArray) {
+        file(name).writeBytes(bytes)
+    }
+
     fun import(context: Context, uri: Uri): String {
         try {
             val bitmap = decode(context, uri)

@@ -1,6 +1,6 @@
 {
-  "versionCode": 3,
-  "versionName": "1.0.2",
+  "versionCode": 4,
+  "versionName": "1.1.0",
   "apkUrl": "https://raw.githubusercontent.com/lulukdog/diary-android/main/release/diary.apk",
-  "changelog": "密钥设置改成已保存时只显示编辑；版本号 1.0.2。"
+  "changelog": "连上日记本后，记下的话会同步过去，保存口令时会把手机上还没同步的文字和照片也记上去，已经传过的不会再传。当天能看到陪伴和心情。一天从北京时间凌晨 4 点切开。"
 }

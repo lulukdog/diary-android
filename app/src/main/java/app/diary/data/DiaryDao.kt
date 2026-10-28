@@ -66,4 +66,21 @@ interface DiaryDao {
 
     @Query("DELETE FROM summaries WHERE dayKey = :day")
     suspend fun deleteSummary(day: String)
+
+    @Transaction
+    @Query(
+        "SELECT * FROM entries WHERE cached = 0 AND synced = 0 ORDER BY dayKey ASC, createdAt ASC",
+    )
+    suspend fun unsyncedWithPhotos(): List<EntryWithPhotos>
+
+    @Query(
+        "UPDATE entries SET textRemoteId = :serverId, syncedServerDay = :serverDay WHERE id = :id",
+    )
+    suspend fun markTextUploaded(id: Long, serverId: Long, serverDay: String)
+
+    @Query("UPDATE photos SET remoteId = :serverId WHERE id = :id")
+    suspend fun markPhotoUploaded(id: Long, serverId: Long)
+
+    @Query("UPDATE entries SET synced = 1, syncedServerDay = :serverDay WHERE id = :id")
+    suspend fun markEntryUploaded(id: Long, serverDay: String)
 }

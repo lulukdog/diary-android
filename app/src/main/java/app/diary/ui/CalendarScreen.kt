@@ -70,7 +70,7 @@ class CalendarViewModel(repository: DiaryRepository) : ViewModel() {
     }
 
     fun showCurrentMonth() {
-        val today = LocalDate.now(DayClock.zone)
+        val today = DayClock.today()
         month.value = YearMonth.from(today)
         selectedDay.value = today.toString()
     }
@@ -96,7 +96,7 @@ fun CalendarScreen(onOpenDay: (String) -> Unit) {
                     Text("日历", style = MaterialTheme.typography.headlineLarge)
                     Spacer(Modifier.height(4.dp))
                     Text(
-                        "按北京时间的日期归档",
+                        "凌晨 4 点之前仍算前一天（北京时间）",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                     )
@@ -121,7 +121,7 @@ fun CalendarScreen(onOpenDay: (String) -> Unit) {
                                 Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, contentDescription = "下个月")
                             }
                         }
-                        if (month != YearMonth.now(DayClock.zone)) {
+                        if (month != YearMonth.from(DayClock.today())) {
                             TextButton(onClick = viewModel::showCurrentMonth) { Text("回到本月") }
                         }
                         Row(Modifier.fillMaxWidth()) {
