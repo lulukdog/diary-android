@@ -74,7 +74,7 @@
     <h1>日记</h1>
     <p class="lead">装在自己的手机上。文字和照片留在这台设备里，不经过应用商店。</p>
     <div class="card">
-      <p>当前安装包 <strong id="ver">1.0.0</strong></p>
+      <p>当前安装包 <strong id="ver">1.0.1</strong></p>
       <p id="log">第一版：写日记、配图、按日摘要，以及从这里安装。</p>
       <a class="download" id="dl" href="diary.apk">下载 APK</a>
       <p class="note">文件名 diary.apk。建议用手机浏览器打开这一页再下载。</p>
@@ -92,17 +92,13 @@
     </ol>
 
     <h2>装好之后如何更新</h2>
-    <p>应用启动时会读取你在「设置」里填写的 version.json。如果里面的 versionCode 比手机上的大，会询问是否下载并交给系统安装器。请允许「日记」安装未知应用，否则下完也无法安装。</p>
-    <p class="note" id="host-warning">当前 version.json 的 apkUrl 仍是示例地址。手机上的「检查更新」会去下载那个地址。把 apkUrl 改成这个 diary.apk 的真实网址后，应用内更新才会下到正确的包。这一页的下载按钮始终指向旁边的 diary.apk。</p>
+    <p>打开应用「设置 → 更新」，点「检查并更新」。没改过地址时，默认读取 GitHub 上的 <code>version.json</code>。如果里面的 versionCode 比手机上的大，会询问是否下载并交给系统安装器。请允许「日记」安装未知应用，否则下完也无法安装。</p>
+    <p class="note" id="host-warning">当前 version.json 的 apkUrl 仍是示例地址。手机上的「检查并更新」会去下载那个地址。把 apkUrl 改成这个 diary.apk 的真实网址后，应用内更新才会下到正确的包。这一页的下载按钮始终指向旁边的 diary.apk。</p>
 
     <h2>托管这个文件夹的人</h2>
     <div class="card">
-      <p>把整个 <code>release</code> 目录放到任意静态网站或局域网 HTTP 服务上。本页、version.json、diary.apk 需要能通过同一个站点访问。</p>
-      <p>然后编辑 version.json，至少改这两处：</p>
-      <ol>
-        <li><code>apkUrl</code>：diary.apk 的完整地址，例如 <code>https://你的域名/diary/diary.apk</code>。</li>
-        <li>发新版时同时提高 <code>versionCode</code>，并让 APK 里的 versionCode 与它一致。versionCode 只能变大，签名必须仍是同一把密钥。</li>
-      </ol>
+      <p>仓库 <code>main</code> 上的 version.json 已经指向同目录的 diary.apk。以后发新版，替换这两个文件并提高 <code>versionCode</code> 即可，签名必须仍是同一把密钥。</p>
+      <p>如果改放到自己的网站，本页、version.json、diary.apk 需要能通过同一个站点访问，并把 <code>apkUrl</code> 改成 diary.apk 的完整地址，例如 <code>https://你的域名/diary/diary.apk</code>。手机设置里的版本清单地址也要改成你的 version.json。</p>
       <p class="note">示例：<code>cd release && python3 -m http.server 8080</code>。手机和电脑在同一网络时，把更新地址设为 <code>http://电脑IP:8080/version.json</code>。</p>
     </div>
   </main>

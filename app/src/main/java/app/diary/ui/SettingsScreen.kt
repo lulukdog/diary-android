@@ -91,7 +91,7 @@ class SettingsViewModel(
     fun saveUpdateUrl(value: String) {
         settings.setUpdateUrl(value)
         updateUrl = settings.updateUrl()
-        message = if (value.isBlank()) "已关闭自动检查" else "更新地址已保存"
+        message = if (value.isBlank()) "已恢复为 GitHub 上的默认地址" else "更新地址已保存"
     }
 
     fun setLocalApi(enabled: Boolean) {
@@ -161,6 +161,8 @@ class SettingsViewModel(
 @Composable
 fun SettingsScreen(
     onCheckUpdate: () -> Unit,
+    updateStatus: String,
+    updateBusy: Boolean,
     notice: String?,
     noticeToken: Int,
     onNoticeConsumed: () -> Unit,
@@ -271,15 +273,27 @@ fun SettingsScreen(
                             onValueChange = { urlInput = it },
                             modifier = Modifier.fillMaxWidth(),
                             label = { Text("版本清单地址") },
-                            placeholder = { Text("https://example.com/diary/version.json") },
+                            placeholder = { Text("https://raw.githubusercontent.com/lulukdog/diary-android/main/release/version.json") },
                             singleLine = true,
                         )
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                            TextButton(onClick = { viewModel.saveUpdateUrl(urlInput) }) { Text("保存地址") }
-                            Button(onClick = onCheckUpdate) { Text("检查更新") }
+                        TextButton(onClick = {
+                            viewModel.saveUpdateUrl(urlInput)
+                            urlInput = viewModel.updateUrl
+                        }) { Text("保存地址") }
+                        Button(
+                            onClick = onCheckUpdate,
+                            enabled = !updateBusy,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) { Text("检查并更新") }
+                        if (updateStatus.isNotBlank()) {
+                            Text(
+                                updateStatus,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            )
                         }
                         Text(
-                            "启动时如果填了地址，会静默看一眼有没有新版本。地址指向你自己托管的 version.json。",
+                            "地址空着就用 GitHub 上的 version.json，不用另填。点「检查并更新」会立刻检查，有新版本再下载并安装。启动时也会静默看一眼。",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                         )

@@ -36,14 +36,18 @@ class AppSettings(context: Context) {
         secure?.edit()?.remove(KEY_API)?.commit()
     }
 
-    /** null 表示用户从未保存过，此时回退到构建时注入的地址。空字符串表示用户主动清空。 */
+    /** 从未保存，或保存的是空字符串时，用构建时注入的地址（默认是本仓库的 version.json）。 */
     fun updateUrl(): String {
-        if (!plain.contains(KEY_URL)) return BuildConfig.UPDATE_MANIFEST_URL.trim()
-        return plain.getString(KEY_URL, "").orEmpty().trim()
+        val saved = plain.getString(KEY_URL, null)?.trim().orEmpty()
+        if (saved.isEmpty()) return BuildConfig.UPDATE_MANIFEST_URL.trim()
+        return saved
     }
 
     fun setUpdateUrl(value: String) {
-        plain.edit().putString(KEY_URL, value.trim()).apply()
+        val trimmed = value.trim()
+        val editor = plain.edit()
+        if (trimmed.isEmpty()) editor.remove(KEY_URL) else editor.putString(KEY_URL, trimmed)
+        editor.apply()
     }
 
     fun localApiEnabled(): Boolean = plain.getBoolean(KEY_LOCAL, false)

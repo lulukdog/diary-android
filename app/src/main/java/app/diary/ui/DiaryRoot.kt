@@ -55,9 +55,13 @@ class UpdateViewModel(private val updates: UpdateRepository) : ViewModel() {
         private set
     var downloading by mutableStateOf(false)
         private set
+    var checking by mutableStateOf(false)
+        private set
     var progress by mutableStateOf(0)
         private set
     var error by mutableStateOf<String?>(null)
+        private set
+    var statusText by mutableStateOf("")
         private set
     var manualMessage by mutableStateOf<String?>(null)
         private set
@@ -80,21 +84,38 @@ class UpdateViewModel(private val updates: UpdateRepository) : ViewModel() {
     }
 
     fun check(manual: Boolean) {
+        if (downloading || checking) return
         if (manual) dismissed = false
+        if (manual) statusText = "正在检查…"
+        checking = true
         viewModelScope.launch {
-            val result = withContext(Dispatchers.IO) { updates.check() }
-            when (result) {
-                UpdateCheck.NoUrl -> if (manual) postManual("还没有填写更新地址")
-                UpdateCheck.UpToDate -> if (manual) postManual("已是最新版本 ${BuildConfig.VERSION_NAME}")
-                is UpdateCheck.Failed -> if (manual) postManual(result.message)
-                is UpdateCheck.Available -> {
-                    if (manual || !dismissed) {
-                        release = result.release
-                        downloaded = null
-                        progress = 0
-                        error = null
+            try {
+                val result = withContext(Dispatchers.IO) { updates.check() }
+                when (result) {
+                    UpdateCheck.NoUrl -> if (manual) {
+                        statusText = "还没有填写更新地址"
+                        postManual(statusText)
+                    }
+                    UpdateCheck.UpToDate -> {
+                        statusText = "已是最新版本"
+                        if (manual) postManual("已是最新版本 ${BuildConfig.VERSION_NAME}")
+                    }
+                    is UpdateCheck.Failed -> if (manual) {
+                        statusText = result.message
+                        postManual(result.message)
+                    }
+                    is UpdateCheck.Available -> {
+                        statusText = "发现新版本 ${result.release.versionName}"
+                        if (manual || !dismissed) {
+                            release = result.release
+                            downloaded = null
+                            progress = 0
+                            error = null
+                        }
                     }
                 }
+            } finally {
+                checking = false
             }
         }
     }
@@ -109,11 +130,15 @@ class UpdateViewModel(private val updates: UpdateRepository) : ViewModel() {
         }
         downloading = true
         error = null
+        statusText = "正在下载 0%"
         viewModelScope.launch {
             try {
                 val apk = withContext(Dispatchers.IO) {
                     updates.download(current) { value ->
-                        mainHandler.post { progress = value }
+                        mainHandler.post {
+                            progress = value
+                            statusText = "正在下载 $value%"
+                        }
                     }
                 }
                 downloaded = apk
@@ -122,6 +147,7 @@ class UpdateViewModel(private val updates: UpdateRepository) : ViewModel() {
             } catch (thrown: Exception) {
                 downloading = false
                 error = thrown.message ?: "下载失败"
+                statusText = error.orEmpty()
             }
         }
     }
@@ -129,6 +155,7 @@ class UpdateViewModel(private val updates: UpdateRepository) : ViewModel() {
     private fun install(apk: File) {
         if (!updates.canInstallPackages()) {
             error = "请允许本应用安装未知应用，回到这里再点一次「安装」。"
+            statusText = error.orEmpty()
             runCatching { updates.openInstallPermissionSettings() }
             return
         }
@@ -136,6 +163,7 @@ class UpdateViewModel(private val updates: UpdateRepository) : ViewModel() {
             updates.install(apk)
         } catch (_: Exception) {
             error = "没有打开系统安装器"
+            statusText = error.orEmpty()
         }
     }
 
@@ -182,6 +210,8 @@ fun DiaryRoot(container: AppContainer) {
             composable("settings") {
                 SettingsScreen(
                     onCheckUpdate = { updates.check(manual = true) },
+                    updateStatus = updates.statusText,
+                    updateBusy = updates.checking || updates.downloading,
                     notice = updates.manualMessage,
                     noticeToken = updates.manualToken,
                     onNoticeConsumed = updates::consumeManual,

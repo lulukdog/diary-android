@@ -25,6 +25,12 @@ fun readLocalSecret(name: String): String {
     return props.getProperty(name).orEmpty().trim()
 }
 
+fun resolveUpdateManifestUrl(): String {
+    val configured = readLocalSecret("UPDATE_MANIFEST_URL")
+    if (configured.isNotEmpty()) return configured
+    return "https://raw.githubusercontent.com/lulukdog/diary-android/main/release/version.json"
+}
+
 fun asJavaString(value: String): String {
     val escaped = buildString {
         value.forEach { ch ->
@@ -48,10 +54,10 @@ android {
         applicationId = "app.diary"
         minSdk = 26
         targetSdk = 37
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.0.1"
         buildConfigField("String", "DEEPSEEK_API_KEY", asJavaString(readLocalSecret("DEEPSEEK_API_KEY")))
-        buildConfigField("String", "UPDATE_MANIFEST_URL", asJavaString(readLocalSecret("UPDATE_MANIFEST_URL")))
+        buildConfigField("String", "UPDATE_MANIFEST_URL", asJavaString(resolveUpdateManifestUrl()))
     }
 
     signingConfigs {

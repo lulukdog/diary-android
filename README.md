@@ -2,14 +2,14 @@
 
 装在自己手机上的日记。文字和照片留在这台设备里，按北京时间（Asia/Shanghai）归到某一天。需要的时候，用 DeepSeek 给这一天写一段短摘要。
 
-可以写成网页上下载的 APK，不经过应用商店。应用自己会在启动时查看你托管的 `version.json`，有新版本就下载并交给系统安装器。
+可以写成网页上下载的 APK，不经过应用商店。装好之后，设置里点「检查并更新」会查看 GitHub 上的 `version.json`，有新版本就下载并交给系统安装器。地址也可以改成你自己托管的清单。
 
 ## 功能
 
 - 今天：写文字，拍照或从相册加图片，图片可以写一句说明。
 - 日历：按月查看，点开某一天可以补记。
 - 当日摘要：把这一天的文字和图片说明发给 DeepSeek（`deepseek-chat`）。图片文件不会上传。
-- 设置：保存 API Key、填写更新地址、导出全部日记、关于。
+- 设置：保存 API Key、检查并更新、导出全部日记、关于。
 - 导出：一个 zip，里面是 `diary-export.json` 和 `photos/`。
 - 本机接口（默认关闭）：只监听 `127.0.0.1`，给以后的插件留一个口子。
 
@@ -65,37 +65,41 @@ chmod +x scripts/build-release.sh
 
 - `index.html`：中文安装页，含 vivo 允许未知来源的步骤
 - `version.json`：应用内更新要读的清单
-- `diary.apk`：执行构建脚本之后出现
+- `diary.apk`：已签名的安装包
 
 `version.json` 的形状：
 
 ```json
 {
-  "versionCode": 1,
-  "versionName": "1.0.0",
-  "apkUrl": "https://example.com/diary/diary.apk",
+  "versionCode": 2,
+  "versionName": "1.0.1",
+  "apkUrl": "https://raw.githubusercontent.com/lulukdog/diary-android/main/release/diary.apk",
   "changelog": "这一版改了什么"
 }
 ```
 
-仓库里的 `apkUrl` 是占位符。托管时改成 `diary.apk` 的真实地址。安装页上的下载按钮始终指向同目录的 `diary.apk`，不走这个字段。
+`apkUrl` 固定指向本仓库 `main` 上的 `release/diary.apk`。安装页上的下载按钮始终指向同目录的 `diary.apk`，不走这个字段。
 
-把整个 `release` 目录放到静态网站或一台电脑上：
+装好这个 APK 之后，打开「设置 → 更新」，点 **检查并更新**。如果这台手机从未保存过版本清单地址，默认就是：
+
+`https://raw.githubusercontent.com/lulukdog/diary-android/main/release/version.json`
+
+有新版本时弹出对话框，再点「下载并安装」，交给系统安装器（`ACTION_VIEW`，类型 `application/vnd.android.package-archive`）。启动时也会用同一地址静默看一眼。检查失败不会打断启动，只有手动点按钮才会说明原因。按钮下面会显示一行状态：正在检查、已是最新版本，或正在下载的百分比。
+
+设置里保存过别的地址时，以保存的为准，不会被默认地址盖掉。把地址清空再保存，会回到上面的 GitHub 地址。
+
+以后发新版：提高 `versionCode` 和 `versionName`（`app/build.gradle.kts` 与 `release/version.json` 保持一致），用同一把密钥重新打包，把新的 `release/diary.apk` 和 `release/version.json` 提交到 `main` 的同样两个路径。已经装过的手机不用改设置里的地址。
+
+也可以把整个 `release` 目录放到自己的网站或电脑上，再在设置里改地址：
 
 ```bash
 cd release
 python3 -m http.server 8080
 ```
 
-在手机上：
+自建时把 `apkUrl` 改成那个 `diary.apk` 的真实网址，并在设置里保存 `http://电脑IP:8080/version.json`（或你的 https 地址）。构建机器上如果设置了 `UPDATE_MANIFEST_URL`，它只作为「设置里还没保存过地址」时的后备，用来替换上面的 GitHub 默认地址。
 
-1. 浏览器打开安装页，下载并安装。vivo 的拦截和纯净模式见安装页。
-2. 打开日记 → 设置 → 版本清单地址，填 `http://电脑IP:8080/version.json`（或你的 https 地址），保存。
-3. 发新版时：提高 `versionCode` 和 `versionName`（gradle 与 `version.json` 保持一致），用同一把密钥重新打包，替换服务器上的 `diary.apk` 和 `version.json`。
-4. 下次打开应用，或在设置里点「检查更新」。确认后会下载 APK，并用系统的安装意图（`ACTION_VIEW`，类型 `application/vnd.android.package-archive`）打开安装器。
-5. 第一次安装更新时，系统会要求允许「日记」安装未知应用。允许后回到应用再点一次「安装」。
-
-检查失败时，启动不会弹错误。只有你手动点「检查更新」才会说明原因。地址留空则不做检查。
+第一次安装更新时，系统会要求允许「日记」安装未知应用。允许后回到应用再点一次「安装」。
 
 局域网可以用 http。DeepSeek 始终走 https。
 
