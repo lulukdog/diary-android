@@ -1,0 +1,6 @@
+{
+  "versionCode": 1,
+  "versionName": "1.0.0",
+  "apkUrl": "https://example.com/diary/diary.apk",
+  "changelog": "第一版：按北京时间写日记、拍照或从相册配图、DeepSeek 当日摘要、网页下载安装和应用内更新。"
+}

@@ -1,0 +1,33 @@
+{
+  "schema": "diary.export.v1",
+  "exportedAt": "2026-10-28T21:05:00+08:00",
+  "timezone": "Asia/Shanghai",
+  "photosIncluded": false,
+  "app": {"id": "app.diary", "versionName": "1.0.0", "versionCode": 1},
+  "days": [
+    {
+      "day": "2026-10-28",
+      "entries": [
+        {
+          "id": 1,
+          "body": "傍晚沿着衡山路走回来，风是凉的。",
+          "createdAt": "2026-10-28T19:40:00+08:00",
+          "updatedAt": "2026-10-28T19:40:00+08:00",
+          "photos": [
+            {
+              "id": 4,
+              "fileName": "0f1c2a3b-4d5e-6789-abcd-ef0123456789.jpg",
+              "caption": "梧桐影子",
+              "createdAt": "2026-10-28T19:41:00+08:00"
+            }
+          ]
+        }
+      ],
+      "summary": {
+        "text": "傍晚沿衡山路走回家，风凉，拍到梧桐影子。",
+        "generatedAt": "2026-10-28T21:00:00+08:00",
+        "sourceHash": "示例，不是真实摘要的哈希"
+      }
+    }
+  ]
+}

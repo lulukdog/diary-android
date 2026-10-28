@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#2C4A3E" />
+  <title>日记 · 下载安装</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --paper: #f3eee6;
+      --ink: #1e1b17;
+      --muted: #5c564e;
+      --pine: #2c4a3e;
+      --line: #e4dcd0;
+      --card: #fcfaf6;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--paper);
+      color: var(--ink);
+      font-family: "PingFang SC", "Noto Sans SC", "Microsoft YaHei", sans-serif;
+      line-height: 1.65;
+    }
+    main {
+      max-width: 40rem;
+      margin: 0 auto;
+      padding: 3.2rem 1.3rem 4rem;
+    }
+    h1 {
+      font-family: "Iowan Old Style", Palatino, "Songti SC", "Noto Serif SC", serif;
+      font-weight: 500;
+      font-size: 3rem;
+      letter-spacing: -0.03em;
+      margin: 0 0 0.4rem;
+    }
+    h2 {
+      font-size: 1.15rem;
+      font-weight: 600;
+      margin: 2.2rem 0 0.6rem;
+    }
+    p { margin: 0.4rem 0 0.8rem; }
+    .lead { color: var(--muted); font-size: 1.05rem; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 1.2rem;
+      padding: 1.1rem 1.15rem;
+      margin-top: 1rem;
+    }
+    a.download {
+      display: inline-block;
+      margin-top: 0.6rem;
+      background: var(--pine);
+      color: #f6f3ee;
+      text-decoration: none;
+      padding: 0.75rem 1.2rem;
+      border-radius: 999px;
+      font-weight: 600;
+    }
+    ol { padding-left: 1.2rem; }
+    li { margin: 0.35rem 0; }
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+      font-size: 0.92em;
+    }
+    .note { color: var(--muted); font-size: 0.95rem; }
+    #host-warning { display: none; color: #8a4b28; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>日记</h1>
+    <p class="lead">装在自己的手机上。文字和照片留在这台设备里，不经过应用商店。</p>
+    <div class="card">
+      <p>当前安装包 <strong id="ver">1.0.0</strong></p>
+      <p id="log">第一版：写日记、配图、按日摘要，以及从这里安装。</p>
+      <a class="download" id="dl" href="diary.apk">下载 APK</a>
+      <p class="note">文件名 diary.apk。建议用手机浏览器打开这一页再下载。</p>
+    </div>
+
+    <h2>在 vivo 上安装</h2>
+    <p>vivo S30 Pro Mini 一类机型使用 OriginOS。系统会拦住「未知来源」的安装包，按下面做即可。菜单名字在不同版本里可能差一两个字。</p>
+    <ol>
+      <li>用手机浏览器打开这个页面，点「下载 APK」。</li>
+      <li>下完后，从浏览器的下载列表或「文件管理」里点开 diary.apk。</li>
+      <li>如果提示风险，选择「继续安装」或「仍要安装」。</li>
+      <li>如果按钮是灰的，或提示禁止安装：打开「设置 → 安全」或「安全与隐私 → 更多安全设置」，进入「安装未知应用」（有的版本叫「外部来源应用」），允许刚才使用的浏览器或文件管理。</li>
+      <li>若开了「纯净模式」或 i 管家拦截，对这一次安装选择允许。纯净模式一般在「设置 → 安全 → 纯净模式」。</li>
+      <li>安装时看清应用名称是「日记」。装好后到「设置」里填写 DeepSeek API Key，摘要才会工作。不填也能写日记。</li>
+    </ol>
+
+    <h2>装好之后如何更新</h2>
+    <p>应用启动时会读取你在「设置」里填写的 version.json。如果里面的 versionCode 比手机上的大，会询问是否下载并交给系统安装器。请允许「日记」安装未知应用，否则下完也无法安装。</p>
+    <p class="note" id="host-warning">当前 version.json 的 apkUrl 仍是示例地址。手机上的「检查更新」会去下载那个地址。把 apkUrl 改成这个 diary.apk 的真实网址后，应用内更新才会下到正确的包。这一页的下载按钮始终指向旁边的 diary.apk。</p>
+
+    <h2>托管这个文件夹的人</h2>
+    <div class="card">
+      <p>把整个 <code>release</code> 目录放到任意静态网站或局域网 HTTP 服务上。本页、version.json、diary.apk 需要能通过同一个站点访问。</p>
+      <p>然后编辑 version.json，至少改这两处：</p>
+      <ol>
+        <li><code>apkUrl</code>：diary.apk 的完整地址，例如 <code>https://你的域名/diary/diary.apk</code>。</li>
+        <li>发新版时同时提高 <code>versionCode</code>，并让 APK 里的 versionCode 与它一致。versionCode 只能变大，签名必须仍是同一把密钥。</li>
+      </ol>
+      <p class="note">示例：<code>cd release && python3 -m http.server 8080</code>。手机和电脑在同一网络时，把更新地址设为 <code>http://电脑IP:8080/version.json</code>。</p>
+    </div>
+  </main>
+  <script>
+    fetch("version.json").then(function (response) { return response.json(); }).then(function (data) {
+      if (data.versionName) document.getElementById("ver").textContent = data.versionName;
+      if (data.changelog) document.getElementById("log").textContent = data.changelog;
+      if (typeof data.apkUrl === "string" && data.apkUrl.indexOf("example.com") !== -1) {
+        document.getElementById("host-warning").style.display = "block";
+      }
+    }).catch(function () {});
+  </script>
+</body>
+</html>
