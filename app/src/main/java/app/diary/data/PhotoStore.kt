@@ -3,21 +3,15 @@ package app.diary.data
 import android.content.ContentResolver
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
-import android.graphics.ImageDecoder
-import android.graphics.Matrix
 import android.net.Uri
 import android.os.Build
 import android.os.ParcelFileDescriptor
-import androidx.annotation.RequiresApi
-import androidx.exifinterface.media.ExifInterface
+import android.util.Size
 import java.io.File
-import java.io.FileInputStream
 import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
 import java.util.UUID
-import kotlin.math.max
 
 class PhotoStore(context: Context) {
     private val directory: File = File(context.filesDir, "photos").apply { mkdirs() }
@@ -49,7 +43,7 @@ class PhotoStore(context: Context) {
      * 在收到相册结果的这一刻打开。vivo 的授权有时只在这次回调里有效，
      * 不能等进了后台再重新 open。
      */
-    fun open(context: Context, uri: Uri): InputStream {
+    fun open(context: Context, uri: Uri): OpenedPhoto {
         if (uri.scheme == ContentResolver.SCHEME_CONTENT) {
             runCatching {
                 context.contentResolver.takePersistableUriPermission(
@@ -58,20 +52,26 @@ class PhotoStore(context: Context) {
                 )
             }
         }
-        return openStream(context.contentResolver, uri)
+        val thumbnail = readThumbnail(context, uri)
+        try {
+            return OpenedPhoto(openStream(context.contentResolver, uri), thumbnail)
+        } catch (error: Throwable) {
+            PhotoBitmaps.recycle(thumbnail)
+            throw error
+        }
     }
 
     fun import(context: Context, uri: Uri): String {
-        val stream = open(context, uri)
-        stream.use { return importStream(it) }
+        val opened = open(context, uri)
+        opened.stream.use { return importStream(it, opened.thumbnail) }
     }
 
-    fun importStream(stream: InputStream): String {
+    fun importStream(stream: InputStream, thumbnail: Bitmap? = null): String {
         val temp = File.createTempFile("import-", ".img", scratch)
         try {
             copyFully(stream, temp)
             val bitmap = try {
-                decodeFile(temp)
+                PhotoBitmaps.decodeImported(temp, thumbnail)
             } catch (error: OutOfMemoryError) {
                 throw PhotoImportException(PhotoImport.Failure.TOO_BIG)
             }
@@ -82,6 +82,7 @@ class PhotoStore(context: Context) {
             }
         } finally {
             temp.delete()
+            PhotoBitmaps.recycle(thumbnail)
         }
     }
 
@@ -115,110 +116,46 @@ class PhotoStore(context: Context) {
     }
 
     private fun write(bitmap: Bitmap): String {
-        val software = PhotoBitmaps.bake(bitmap)
         val name = UUID.randomUUID().toString() + ".jpg"
+        val saved = file(name)
         try {
-            FileOutputStream(file(name)).use { output ->
-                if (!software.compress(Bitmap.CompressFormat.JPEG, 85, output)) {
+            FileOutputStream(saved).use { output ->
+                if (!bitmap.compress(Bitmap.CompressFormat.JPEG, 85, output)) {
                     throw PhotoImportException(PhotoImport.Failure.SAVE)
                 }
             }
+            val check = PhotoBitmaps.decodeStored(saved)
+            if (check == null) {
+                saved.delete()
+                throw PhotoImportException(PhotoImport.Failure.BLANK)
+            }
+            PhotoBitmaps.recycle(check)
             return name
         } catch (error: Exception) {
-            file(name).delete()
+            saved.delete()
             throw error
         } finally {
-            software.recycle()
+            PhotoBitmaps.recycle(bitmap)
         }
     }
 
-    private fun decodeFile(file: File): Bitmap {
-        val kind = file.inputStream().use { PhotoImport.kindOf(PhotoImport.readPrefix(it)) }
-        val decoded = if (PhotoImport.bitmapFactoryFirst(kind)) {
-            decodeWithBitmapFactory(file) ?: decodeWithImageDecoderOrNull(file)
-        } else {
-            decodeWithImageDecoderOrNull(file) ?: decodeWithBitmapFactory(file)
+    private fun readThumbnail(context: Context, uri: Uri): Bitmap? {
+        if (Build.VERSION.SDK_INT < 29) return null
+        val raw = try {
+            context.contentResolver.loadThumbnail(uri, Size(PhotoImport.MAX_SIDE, PhotoImport.MAX_SIDE), null)
+        } catch (error: OutOfMemoryError) {
+            throw error
+        } catch (_: Throwable) {
+            return null
         }
-        if (decoded == null) {
-            throw PhotoImportException(PhotoImport.failureForDecode(kind), kind)
+        val plain = try {
+            PhotoBitmaps.plainCopy(raw)
+        } catch (error: OutOfMemoryError) {
+            PhotoBitmaps.recycle(raw)
+            throw error
         }
-        return decoded
-    }
-
-    private fun decodeWithImageDecoderOrNull(file: File): Bitmap? {
-        if (Build.VERSION.SDK_INT < 28) return null
-        return runCatching { decodeWithImageDecoder(file) }.getOrNull()
-    }
-
-    @RequiresApi(28)
-    private fun decodeWithImageDecoder(file: File): Bitmap {
-        val source = ImageDecoder.createSource(file)
-        val bitmap = ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
-            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
-            val width = info.size.width
-            val height = info.size.height
-            if (width <= 0 || height <= 0) return@decodeBitmap
-            val (targetWidth, targetHeight) = PhotoImport.targetSize(width, height)
-            if (targetWidth != width || targetHeight != height) {
-                decoder.setTargetSize(targetWidth, targetHeight)
-            }
-        }
-        return prepare(bitmap, degrees = 0)
-    }
-
-    private fun decodeWithBitmapFactory(file: File): Bitmap? {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        FileInputStream(file).use { input ->
-            BitmapFactory.decodeFileDescriptor(input.fd, null, bounds)
-        }
-        if (bounds.outWidth <= 0 || bounds.outHeight <= 0) return null
-        val options = BitmapFactory.Options().apply {
-            inSampleSize = PhotoImport.sampleSize(bounds.outWidth, bounds.outHeight)
-            inPreferredConfig = Bitmap.Config.ARGB_8888
-            inMutable = true
-            inScaled = false
-        }
-        val decoded = FileInputStream(file).use { input ->
-            BitmapFactory.decodeFileDescriptor(input.fd, null, options)
-        } ?: return null
-        return prepare(decoded, readDegrees(file))
-    }
-
-    private fun prepare(bitmap: Bitmap, degrees: Int): Bitmap {
-        val baked = PhotoBitmaps.bake(bitmap)
-        return PhotoBitmaps.bake(scaleDown(rotate(baked, degrees)))
-    }
-
-    private fun readDegrees(file: File): Int {
-        val orientation = runCatching {
-            ExifInterface(file).getAttributeInt(
-                ExifInterface.TAG_ORIENTATION,
-                ExifInterface.ORIENTATION_NORMAL,
-            )
-        }.getOrDefault(ExifInterface.ORIENTATION_NORMAL)
-        return PhotoImport.degrees(orientation)
-    }
-
-    private fun rotate(source: Bitmap, degrees: Int): Bitmap {
-        if (degrees == 0) return source
-        val matrix = Matrix().apply { postRotate(degrees.toFloat()) }
-        val rotated = Bitmap.createBitmap(source, 0, 0, source.width, source.height, matrix, true)
-        if (rotated != source) source.recycle()
-        return rotated
-    }
-
-    private fun scaleDown(source: Bitmap): Bitmap {
-        val longest = max(source.width, source.height).toFloat()
-        if (longest <= PhotoImport.MAX_SIDE) return source
-        val scale = PhotoImport.MAX_SIDE / longest
-        val scaled = Bitmap.createScaledBitmap(
-            source,
-            (source.width * scale).toInt().coerceAtLeast(1),
-            (source.height * scale).toInt().coerceAtLeast(1),
-            true,
-        )
-        if (scaled != source) source.recycle()
-        return scaled
+        if (plain !== raw) PhotoBitmaps.recycle(raw)
+        return plain
     }
 
     private fun openStream(resolver: ContentResolver, uri: Uri): InputStream {
@@ -267,3 +204,8 @@ class PhotoStore(context: Context) {
         return ParcelFileDescriptor.AutoCloseInputStream(descriptor)
     }
 }
+
+class OpenedPhoto(
+    val stream: InputStream,
+    val thumbnail: Bitmap?,
+)

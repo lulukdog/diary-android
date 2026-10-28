@@ -59,22 +59,24 @@ class PhotoImportTest {
     }
 
     @Test
-    fun jpegFromAlbumOrCameraStaysOnBitmapFactoryAndPlainSrgb() {
+    fun jpegTriesBitmapFactoryBeforeThumbnailAndBlankPixelsAreRejected() {
         val jpeg = byteArrayOf(0xFF.toByte(), 0xD8.toByte(), 0xFF.toByte(), 0xE1.toByte(), 0x00, 0x00)
         assertEquals(PhotoImport.Kind.JPEG, PhotoImport.kindOf(jpeg))
-        assertTrue(PhotoImport.bitmapFactoryFirst(PhotoImport.Kind.JPEG))
-        assertTrue(PhotoImport.bitmapFactoryFirst(PhotoImport.Kind.PNG))
-        assertTrue(PhotoImport.bitmapFactoryFirst(PhotoImport.Kind.WEBP))
-        assertTrue(PhotoImport.bitmapFactoryFirst(PhotoImport.Kind.GIF))
-        assertTrue(PhotoImport.bitmapFactoryFirst(PhotoImport.Kind.UNKNOWN))
-        assertFalse(PhotoImport.bitmapFactoryFirst(PhotoImport.Kind.HEIF))
-        assertTrue(PhotoImport.needsSrgbBake("HARDWARE", isSrgb = true, hasGainmap = false))
-        assertTrue(PhotoImport.needsSrgbBake("RGBA_F16", isSrgb = true, hasGainmap = false))
-        assertTrue(PhotoImport.needsSrgbBake("RGB_565", isSrgb = true, hasGainmap = false))
-        assertTrue(PhotoImport.needsSrgbBake(null, isSrgb = false, hasGainmap = false))
-        assertTrue(PhotoImport.needsSrgbBake("ARGB_8888", isSrgb = false, hasGainmap = false))
-        assertTrue(PhotoImport.needsSrgbBake("ARGB_8888", isSrgb = true, hasGainmap = true))
-        assertFalse(PhotoImport.needsSrgbBake("ARGB_8888", isSrgb = true, hasGainmap = false))
+        assertEquals(
+            listOf(PhotoImport.Source.FACTORY, PhotoImport.Source.DECODER, PhotoImport.Source.THUMBNAIL),
+            PhotoImport.sourceOrder(PhotoImport.Kind.JPEG),
+        )
+        assertEquals(PhotoImport.Source.DECODER, PhotoImport.sourceOrder(PhotoImport.Kind.HEIF).first())
+        assertEquals(PhotoImport.Source.THUMBNAIL, PhotoImport.sourceOrder(PhotoImport.Kind.PNG).last())
+        assertTrue(PhotoImport.isNearlyBlank(IntArray(0)))
+        assertTrue(PhotoImport.isNearlyBlank(intArrayOf(0xFF000000.toInt(), 0xFF010101.toInt())))
+        assertFalse(PhotoImport.isNearlyBlank(intArrayOf(0xFF000000.toInt(), 0xFF090909.toInt())))
+        val pixels = IntArray(8 * 8)
+        pixels[4 * 8 + 4] = 0xFFFF0000.toInt()
+        assertFalse(PhotoImport.isNearlyBlank(PhotoImport.sampleGrid(pixels, 8, 8)))
+        pixels.fill(0xFF000000.toInt())
+        assertTrue(PhotoImport.isNearlyBlank(PhotoImport.sampleGrid(pixels, 8, 8)))
+        assertTrue(PhotoImport.sampleGrid(IntArray(3), 8, 8).isEmpty())
     }
 
     @Test
@@ -97,6 +99,10 @@ class PhotoImportTest {
         assertEquals(PhotoImport.Failure.UNSUPPORTED, PhotoImport.failureForDecode(PhotoImport.Kind.HEIF))
         assertEquals(PhotoImport.Failure.DECODE, PhotoImport.failureForDecode(PhotoImport.Kind.JPEG))
         assertEquals("图片太大，这台设备内存不够", PhotoImport.message(PhotoImport.Failure.TOO_BIG))
+        assertEquals(
+            "这张图片读出来是黑的，请换一张或重试",
+            PhotoImport.message(PhotoImport.Failure.BLANK),
+        )
     }
 
     private fun riff(kind: String): ByteArray {

@@ -1,6 +1,6 @@
 {
-  "versionCode": 6,
-  "versionName": "1.1.2",
+  "versionCode": 7,
+  "versionName": "1.1.3",
   "apkUrl": "https://raw.githubusercontent.com/lulukdog/diary-android/main/release/diary.apk",
-  "changelog": "照片可以正常显示，点一下能放大。如果还是黑的，删掉这张后重新添加一次。"
+  "changelog": "照片按读出的像素保存和显示。如果还是黑的，会提示重新添加，不再留一块黑图。"
 }

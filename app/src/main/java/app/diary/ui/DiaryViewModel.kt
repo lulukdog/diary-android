@@ -72,7 +72,7 @@ abstract class DraftViewModel(
             message = "一则日记最多 9 张图片"
             return
         }
-        val stream = try {
+        val opened = try {
             photos.open(context, uri)
         } catch (error: Exception) {
             deleteAfter?.delete()
@@ -84,9 +84,9 @@ abstract class DraftViewModel(
             try {
                 val name = withContext(Dispatchers.IO) {
                     try {
-                        photos.importStream(stream)
+                        photos.importStream(opened.stream, opened.thumbnail)
                     } finally {
-                        runCatching { stream.close() }
+                        runCatching { opened.stream.close() }
                         deleteAfter?.delete()
                     }
                 }
