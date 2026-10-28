@@ -154,7 +154,7 @@ fun SummaryScreen(dayKey: String, onBack: () -> Unit) {
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "生成时只把这一天的文字和图片说明发给 DeepSeek，图片文件留在手机上。",
+                    "陪伴优先看当天页面上日记本的卡片和「问它」。这里仍是可选的本机摘要：生成时只把这一天的文字和图片说明发给 DeepSeek，图片文件留在手机上。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

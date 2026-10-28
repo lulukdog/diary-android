@@ -8,6 +8,9 @@ import java.time.format.DateTimeFormatter
 import java.util.Locale
 
 object DayClock {
+    /** 与日记本一致：凌晨 4 点之前仍算前一天。 */
+    const val BOUNDARY_HOUR = 4
+
     val zone: ZoneId = ZoneId.of("Asia/Shanghai")
 
     private val dayFormatter: DateTimeFormatter =
@@ -19,8 +22,13 @@ object DayClock {
     private val dateTimeFormatter: DateTimeFormatter =
         DateTimeFormatter.ofPattern("M月d日 HH:mm", Locale.CHINA)
 
-    fun dayKey(epochMillis: Long = System.currentTimeMillis()): String =
-        Instant.ofEpochMilli(epochMillis).atZone(zone).toLocalDate().toString()
+    fun dayKey(epochMillis: Long = System.currentTimeMillis()): String {
+        val zoned = Instant.ofEpochMilli(epochMillis).atZone(zone)
+        val date = if (zoned.hour < BOUNDARY_HOUR) zoned.toLocalDate().minusDays(1) else zoned.toLocalDate()
+        return date.toString()
+    }
+
+    fun today(nowMillis: Long = System.currentTimeMillis()): LocalDate = LocalDate.parse(dayKey(nowMillis))
 
     fun isDayKey(value: String): Boolean = runCatching { LocalDate.parse(value) }.isSuccess
 

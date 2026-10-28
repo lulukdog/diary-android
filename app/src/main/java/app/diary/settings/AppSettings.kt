@@ -7,6 +7,7 @@ import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import app.diary.BuildConfig
+import app.diary.journal.JournalUrls
 import java.security.SecureRandom
 
 class AppSettings(context: Context) {
@@ -48,6 +49,33 @@ class AppSettings(context: Context) {
         val editor = plain.edit()
         if (trimmed.isEmpty()) editor.remove(KEY_URL) else editor.putString(KEY_URL, trimmed)
         editor.apply()
+    }
+
+    fun journalBaseUrl(): String = JournalUrls.normalizeBase(plain.getString(KEY_JOURNAL_URL, null))
+
+    fun setJournalBaseUrl(value: String) {
+        val trimmed = value.trim()
+        if (trimmed.isEmpty()) {
+            plain.edit().remove(KEY_JOURNAL_URL).apply()
+            return
+        }
+        val normalized = JournalUrls.normalizeBase(trimmed)
+        plain.edit().putString(KEY_JOURNAL_URL, normalized).apply()
+    }
+
+    fun journalToken(): String = secure?.getString(KEY_JOURNAL_TOKEN, null)?.trim().orEmpty()
+
+    fun hasJournalToken(): Boolean = journalToken().isNotEmpty()
+
+    fun setJournalToken(value: String) {
+        val prefs = secure ?: error("这台设备的加密存储不可用")
+        val trimmed = value.trim()
+        if (trimmed.isEmpty()) error("口令是空的")
+        prefs.edit().putString(KEY_JOURNAL_TOKEN, trimmed).commit()
+    }
+
+    fun clearJournalToken() {
+        secure?.edit()?.remove(KEY_JOURNAL_TOKEN)?.commit()
     }
 
     fun localApiEnabled(): Boolean = plain.getBoolean(KEY_LOCAL, false)
@@ -101,5 +129,7 @@ class AppSettings(context: Context) {
         private const val KEY_TOKEN = "local_api_token"
         private const val KEY_URL = "update_manifest_url"
         private const val KEY_LOCAL = "local_api_enabled"
+        private const val KEY_JOURNAL_URL = "journal_base_url"
+        private const val KEY_JOURNAL_TOKEN = "journal_app_token"
     }
 }

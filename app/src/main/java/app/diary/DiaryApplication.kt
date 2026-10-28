@@ -7,6 +7,9 @@ import app.diary.data.DiaryDatabase
 import app.diary.data.DiaryRepository
 import app.diary.data.PhotoStore
 import app.diary.export.DiaryExporter
+import app.diary.journal.JournalClient
+import app.diary.journal.JournalRepository
+import app.diary.journal.JournalSync
 import app.diary.localapi.LocalDiaryServer
 import app.diary.settings.AppSettings
 import app.diary.update.UpdateRepository
@@ -41,6 +44,8 @@ class AppContainer(app: Application) {
         .writeTimeout(90, TimeUnit.SECONDS)
         .build()
     val deepSeek = DeepSeekClient(http)
+    val journal = JournalRepository(settings, JournalClient(http), repository, photos)
+    val journalSync = JournalSync(journal)
     val updates = UpdateRepository(app, http, settings, BuildConfig.VERSION_CODE)
     val exporter = DiaryExporter(app, repository, photos)
     val localServer = LocalDiaryServer(repository, settings)
@@ -55,6 +60,9 @@ class AppContainer(app: Application) {
         }
         if (settings.localApiEnabled() && settings.secureAvailable && settings.token().isNotBlank()) {
             localServer.start()
+        }
+        if (journal.configured()) {
+            journalSync.start(announceIfEmpty = false)
         }
     }
 }

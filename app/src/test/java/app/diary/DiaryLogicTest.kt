@@ -24,13 +24,18 @@ import java.time.YearMonth
 
 class DiaryLogicTest {
     @Test
-    fun shanghaiDayChangesAtMidnightNotUtc() {
-        val before = Instant.parse("2026-10-27T15:59:00Z").toEpochMilli()
-        val after = Instant.parse("2026-10-27T16:00:00Z").toEpochMilli()
-        assertEquals("2026-10-27", DayClock.dayKey(before))
-        assertEquals("2026-10-28", DayClock.dayKey(after))
-        assertTrue(DayClock.isToday("2026-10-28", after))
-        assertFalse(DayClock.isToday("2026-10-28", before))
+    fun shanghaiDayChangesAtFourNotMidnight() {
+        val lateNight = Instant.parse("2026-10-27T15:59:00Z").toEpochMilli()
+        val midnight = Instant.parse("2026-10-27T16:00:00Z").toEpochMilli()
+        val beforeBoundary = Instant.parse("2026-10-27T19:59:00Z").toEpochMilli()
+        val atBoundary = Instant.parse("2026-10-27T20:00:00Z").toEpochMilli()
+        assertEquals("2026-10-27", DayClock.dayKey(lateNight))
+        assertEquals("2026-10-27", DayClock.dayKey(midnight))
+        assertEquals("2026-10-27", DayClock.dayKey(beforeBoundary))
+        assertEquals("2026-10-28", DayClock.dayKey(atBoundary))
+        assertTrue(DayClock.isToday("2026-10-28", atBoundary))
+        assertFalse(DayClock.isToday("2026-10-28", beforeBoundary))
+        assertEquals(4, DayClock.BOUNDARY_HOUR)
     }
 
     @Test

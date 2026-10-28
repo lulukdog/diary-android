@@ -54,8 +54,8 @@ android {
         applicationId = "app.diary"
         minSdk = 26
         targetSdk = 37
-        versionCode = 3
-        versionName = "1.0.2"
+        versionCode = 4
+        versionName = "1.1.0"
         buildConfigField("String", "DEEPSEEK_API_KEY", asJavaString(readLocalSecret("DEEPSEEK_API_KEY")))
         buildConfigField("String", "UPDATE_MANIFEST_URL", asJavaString(resolveUpdateManifestUrl()))
     }
@@ -129,4 +129,5 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.2")
 
     testImplementation("junit:junit:4.13.2")
+    testImplementation("org.json:json:20240303")
 }
