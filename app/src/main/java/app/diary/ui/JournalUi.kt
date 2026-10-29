@@ -11,6 +11,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Button
+import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -22,56 +24,48 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.unit.dp
 import app.diary.domain.DayClock
-import app.diary.journal.JournalDay
 import app.diary.journal.JournalEntry
 import app.diary.journal.JournalUtterance
 import app.diary.journal.TimelineItem
-import app.diary.journal.companionLines
-import app.diary.journal.hasEmotionCard
 import app.diary.journal.journalMillis
 
 @Composable
-fun EmotionCard(day: JournalDay) {
-    if (!day.hasEmotionCard()) return
-    val card = day.card
-    val lines = day.companionLines()
-    val title = if (day.day == day.today) "今天的你" else "那天的你"
-    val counts = buildList {
-        val entries = card?.entryCount ?: 0
-        val images = card?.imageCount ?: 0
-        if (entries > 0) add("$entries 段")
-        if (images > 0) add("$images 张图")
+fun PresenceCard(line: String) {
+    Card(
+        modifier = Modifier.fillMaxWidth(),
+        shape = RoundedCornerShape(20.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = MaterialTheme.colorScheme.primaryContainer,
+            contentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+        ),
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp),
+    ) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text("我在", style = MaterialTheme.typography.labelLarge)
+            Text(line, style = MaterialTheme.typography.bodyLarge)
+        }
     }
+}
+
+@Composable
+fun DaySummaryCard(
+    title: String,
+    lines: List<String>,
+    keywords: List<String>,
+    mood: Int?,
+) {
     QuietCard {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(title, style = MaterialTheme.typography.titleMedium)
-                if (counts.isNotEmpty()) {
-                    Text(
-                        counts.joinToString(" · "),
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                }
-            }
-            if (card?.mood != null) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            if (mood != null) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("状态", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                    MoodBar(card.mood)
+                    MoodBar(mood)
                 }
             }
-            val label = card?.moodLabel
-            if (!label.isNullOrBlank()) {
-                Text("「$label」", style = MaterialTheme.typography.bodyLarge)
-            }
             lines.forEach { line ->
-                Text(line, style = MaterialTheme.typography.bodyLarge, color = MaterialTheme.colorScheme.primary)
+                Text(line, style = MaterialTheme.typography.bodyLarge)
             }
-            val headline = card?.headline
-            if (!headline.isNullOrBlank()) {
-                Text(headline, style = MaterialTheme.typography.bodyMedium)
-            }
-            val keywords = card?.keywords.orEmpty()
             if (keywords.isNotEmpty()) {
                 Text(
                     keywords.joinToString("  "),
@@ -79,12 +73,26 @@ fun EmotionCard(day: JournalDay) {
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
             }
-            if (card != null && card.mood == null && !card.finalized && card.entryCount > 0) {
-                Text(
-                    "今天的总结要等晚上。",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+        }
+    }
+}
+
+@Composable
+fun SummaryEmptyCard(
+    title: String,
+    copy: String,
+    action: String?,
+    busy: Boolean,
+    onAction: () -> Unit,
+) {
+    QuietCard {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
+            Text(copy, style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+            if (action != null) {
+                Button(onClick = onAction, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
+                    Text(if (busy) "正在整理…" else action)
+                }
             }
         }
     }

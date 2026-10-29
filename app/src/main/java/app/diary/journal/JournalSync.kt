@@ -35,7 +35,7 @@ class JournalSync(private val journal: JournalRepository) {
         if (job?.isActive == true) return
         if (!journal.configured()) {
             if (announceIfEmpty) {
-                phase.value = SyncPhase.Finished("先保存日记本口令")
+                phase.value = SyncPhase.Finished("先连接日记本")
             }
             return
         }

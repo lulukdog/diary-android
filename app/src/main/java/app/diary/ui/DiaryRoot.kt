@@ -199,10 +199,7 @@ fun DiaryRoot(container: AppContainer) {
             modifier = Modifier.padding(padding),
         ) {
             composable("today") {
-                TodayScreen(
-                    onOpenSummary = { day -> nav.navigate("summary/$day") },
-                    onEdit = { id -> nav.navigate("edit/$id") },
-                )
+                TodayScreen(onEdit = { id -> nav.navigate("edit/$id") })
             }
             composable("calendar") {
                 CalendarScreen(onOpenDay = { day -> nav.navigate("day/$day") })
@@ -225,7 +222,6 @@ fun DiaryRoot(container: AppContainer) {
                 DayScreen(
                     dayKey = day,
                     onBack = { nav.popBackStack() },
-                    onOpenSummary = { target -> nav.navigate("summary/$target") },
                     onEdit = { id -> nav.navigate("edit/$id") },
                 )
             }
