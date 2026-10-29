@@ -54,8 +54,8 @@ android {
         applicationId = "app.diary"
         minSdk = 26
         targetSdk = 37
-        versionCode = 8
-        versionName = "1.1.4"
+        versionCode = 9
+        versionName = "1.1.5"
         buildConfigField("String", "DEEPSEEK_API_KEY", asJavaString(readLocalSecret("DEEPSEEK_API_KEY")))
         buildConfigField("String", "UPDATE_MANIFEST_URL", asJavaString(resolveUpdateManifestUrl()))
     }

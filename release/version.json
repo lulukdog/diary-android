@@ -1,6 +1,6 @@
 {
-  "versionCode": 8,
-  "versionName": "1.1.4",
+  "versionCode": 9,
+  "versionName": "1.1.5",
   "apkUrl": "https://raw.githubusercontent.com/lulukdog/diary-android/main/release/diary.apk",
-  "changelog": "深浅色跟随系统。设置只保留状态和按钮，日记本与更新地址使用默认配置。首页可以翻看昨天和今天的小结。记下之后，会轻轻接一句。"
+  "changelog": "翻到前一天也会整理出小结。没有模型密钥或暂时离线时，从当天写下的话里摘一两句，不再空白。"
 }

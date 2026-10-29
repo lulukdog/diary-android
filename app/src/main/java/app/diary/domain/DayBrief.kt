@@ -30,11 +30,12 @@ fun dayBrief(
             if (text.isEmpty() || text == presence || text in this) return
             add(text)
         }
+        val headlineText = headline?.trim().orEmpty()
         addDistinct(headline)
         val label = moodLabel?.trim().orEmpty()
         if (label.isNotEmpty()) addDistinct("「$label」")
         serverLines.drop(1).forEach { addDistinct(it) }
-        addDistinct(localSummary)
+        if (headlineText.isEmpty()) addDistinct(localSummary)
     }
     return DayBrief(
         presence = presence,
@@ -69,8 +70,5 @@ fun summaryEmptyMessage(
     }
 }
 
-fun summaryActionLabel(today: Boolean, connected: Boolean, canDraftLocally: Boolean): String? = when {
-    today && (connected || canDraftLocally) -> "生成今日小结"
-    !today && connected -> "同步这一天"
-    else -> null
-}
+fun summaryActionLabel(today: Boolean): String =
+    if (today) "生成今日小结" else "整理这一天"

@@ -70,7 +70,7 @@ class CompanionVoiceTest {
         assertTrue(brief.summaryLines.contains("这一天过得很沉"))
         assertTrue(brief.summaryLines.contains("「有点撑」"))
         assertTrue(brief.summaryLines.contains("听着有点累。先歇一会儿也行，我在。"))
-        assertTrue(brief.summaryLines.contains("本地的一段"))
+        assertFalse(brief.summaryLines.contains("本地的一段"))
         assertEquals(listOf("加班"), brief.keywords)
         assertTrue(summaryCardVisible(brief))
     }
@@ -94,9 +94,8 @@ class CompanionVoiceTest {
             "今天的小结还没写好。上面那句先留在这儿。",
             summaryEmptyMessage(today = true, connected = true, finalized = false, hasPresence = true),
         )
-        assertEquals("生成今日小结", summaryActionLabel(today = true, connected = false, canDraftLocally = true))
-        assertEquals("同步这一天", summaryActionLabel(today = false, connected = true, canDraftLocally = false))
-        assertNull(summaryActionLabel(today = false, connected = false, canDraftLocally = false))
+        assertEquals("生成今日小结", summaryActionLabel(today = true))
+        assertEquals("整理这一天", summaryActionLabel(today = false))
     }
 
     @Test
