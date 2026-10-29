@@ -3,15 +3,19 @@ package app.diary.ui.theme
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
+import android.os.Build
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Shapes
 import androidx.compose.material3.Typography
 import androidx.compose.material3.darkColorScheme
+import androidx.compose.material3.dynamicDarkColorScheme
+import androidx.compose.material3.dynamicLightColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
@@ -98,6 +102,8 @@ private val DiaryShapes = Shapes(
 @Composable
 fun DiaryTheme(content: @Composable () -> Unit) {
     val dark = isSystemInDarkTheme()
+    val context = LocalContext.current
+    val colors = diaryColors(context, dark)
     val view = LocalView.current
     if (!view.isInEditMode) {
         val activity = view.context.findActivity()
@@ -110,10 +116,25 @@ fun DiaryTheme(content: @Composable () -> Unit) {
         }
     }
     MaterialTheme(
-        colorScheme = if (dark) DarkColors else LightColors,
+        colorScheme = colors,
         typography = DiaryTypography,
         shapes = DiaryShapes,
         content = content,
+    )
+}
+
+/** 浅色或深色跟着系统走。Android 12 起主色用系统动态色，纸色背景仍用日记自己的。 */
+private fun diaryColors(context: Context, dark: Boolean) = run {
+    val base = if (dark) DarkColors else LightColors
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) return@run base
+    val dynamic = if (dark) dynamicDarkColorScheme(context) else dynamicLightColorScheme(context)
+    base.copy(
+        primary = dynamic.primary,
+        onPrimary = dynamic.onPrimary,
+        primaryContainer = dynamic.primaryContainer,
+        onPrimaryContainer = dynamic.onPrimaryContainer,
+        secondary = dynamic.secondary,
+        onSecondary = dynamic.onSecondary,
     )
 }
 

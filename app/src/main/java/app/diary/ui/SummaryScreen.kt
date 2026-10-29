@@ -63,7 +63,7 @@ class SummaryViewModel(
             try {
                 val key = settings.resolveApiKey()
                 if (key.isBlank()) {
-                    error = "请先在设置里填写 DeepSeek API Key"
+                    error = "小结以日记本上的一天卡片为准。这台设备没有另外的摘要密钥。"
                     return@launch
                 }
                 val rows = repository.entriesForDay(dayKey)
@@ -154,7 +154,7 @@ fun SummaryScreen(dayKey: String, onBack: () -> Unit) {
                 }
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    "陪伴优先看当天页面上日记本的卡片和「问它」。这里仍是可选的本机摘要：生成时只把这一天的文字和图片说明发给 DeepSeek，图片文件留在手机上。",
+                    "每天的小结优先显示日记本上的卡片。这里只在这台设备已经有密钥时，才另外整理一段，不会在设置里再填一次。",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

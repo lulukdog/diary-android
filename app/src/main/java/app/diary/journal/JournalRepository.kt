@@ -185,7 +185,7 @@ class JournalRepository(
 
     private fun requireToken(): String {
         val token = settings.journalToken()
-        if (token.isBlank()) throw JournalException("先在设置里填写日记本口令")
+        if (token.isBlank()) throw JournalException("先在设置里连接日记本")
         return token
     }
 }

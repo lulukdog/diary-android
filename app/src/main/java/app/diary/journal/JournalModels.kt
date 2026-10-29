@@ -167,7 +167,7 @@ fun imageDataUrl(bytes: ByteArray): String {
 fun journalErrorMessage(code: Int, raw: String): String {
     val detail = detailText(raw)
     return when (code) {
-        401 -> "口令不对。请在设置里核对日记本口令。"
+        401 -> "口令不对。请在设置里重新连接日记本。"
         429 -> detail.ifBlank { "试得太频繁，过一会儿再来。" }
         else -> detail.ifBlank { "日记本返回 $code" }
     }

@@ -7,6 +7,7 @@ import android.content.SharedPreferences
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import app.diary.BuildConfig
+import app.diary.domain.UpdateUrls
 import app.diary.journal.JournalUrls
 import java.security.SecureRandom
 
@@ -37,12 +38,8 @@ class AppSettings(context: Context) {
         secure?.edit()?.remove(KEY_API)?.commit()
     }
 
-    /** 从未保存，或保存的是空字符串时，用构建时注入的地址（默认是本仓库的 version.json）。 */
-    fun updateUrl(): String {
-        val saved = plain.getString(KEY_URL, null)?.trim().orEmpty()
-        if (saved.isEmpty()) return BuildConfig.UPDATE_MANIFEST_URL.trim()
-        return saved
-    }
+    /** 固定用构建时的清单地址。以前在设置里保存过的地址不再生效。 */
+    fun updateUrl(): String = UpdateUrls.resolve(BuildConfig.UPDATE_MANIFEST_URL)
 
     fun setUpdateUrl(value: String) {
         val trimmed = value.trim()
@@ -51,7 +48,8 @@ class AppSettings(context: Context) {
         editor.apply()
     }
 
-    fun journalBaseUrl(): String = JournalUrls.normalizeBase(plain.getString(KEY_JOURNAL_URL, null))
+    /** 固定为日记本默认地址。以前保存过的自定义地址不再生效。 */
+    fun journalBaseUrl(): String = JournalUrls.DEFAULT_BASE
 
     fun setJournalBaseUrl(value: String) {
         val trimmed = value.trim()

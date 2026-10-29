@@ -1,6 +1,6 @@
 {
-  "versionCode": 7,
-  "versionName": "1.1.3",
+  "versionCode": 8,
+  "versionName": "1.1.4",
   "apkUrl": "https://raw.githubusercontent.com/lulukdog/diary-android/main/release/diary.apk",
-  "changelog": "照片按读出的像素保存和显示。如果还是黑的，会提示重新添加，不再留一块黑图。"
+  "changelog": "深浅色跟随系统。设置只保留状态和按钮，日记本与更新地址使用默认配置。首页可以翻看昨天和今天的小结。记下之后，会轻轻接一句。"
 }

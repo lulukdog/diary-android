@@ -35,6 +35,31 @@ object DayClock {
     fun isToday(dayKey: String, nowMillis: Long = System.currentTimeMillis()): Boolean =
         dayKey == dayKey(nowMillis)
 
+    fun isYesterday(dayKey: String, nowMillis: Long = System.currentTimeMillis()): Boolean {
+        val today = dayKey(nowMillis)
+        return dayKey == shiftDay(today, -1, today = today)
+    }
+
+    /** 往前或往后一天。结果晚于 [today] 时返回 null，不能翻到还没来的日子。 */
+    fun shiftDay(dayKey: String, days: Long, today: String = dayKey()): String? {
+        if (!isDayKey(dayKey) || !isDayKey(today)) return null
+        val next = LocalDate.parse(dayKey).plusDays(days).toString()
+        if (next > today) return null
+        return next
+    }
+
+    fun relativeTitle(dayKey: String, nowMillis: Long = System.currentTimeMillis()): String = when {
+        isToday(dayKey, nowMillis) -> "今天"
+        isYesterday(dayKey, nowMillis) -> "昨天"
+        else -> formatDay(dayKey)
+    }
+
+    fun summaryHeading(dayKey: String, nowMillis: Long = System.currentTimeMillis()): String = when {
+        isToday(dayKey, nowMillis) -> "今天的小结"
+        isYesterday(dayKey, nowMillis) -> "昨天的小结"
+        else -> "这一天的小结"
+    }
+
     fun formatDay(dayKey: String): String = LocalDate.parse(dayKey).format(dayFormatter)
 
     fun formatMonth(month: YearMonth): String = month.format(monthFormatter)
