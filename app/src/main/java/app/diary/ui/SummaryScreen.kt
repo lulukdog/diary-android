@@ -31,6 +31,7 @@ import app.diary.data.toSummarySource
 import app.diary.domain.DayClock
 import app.diary.domain.buildSummaryPrompt
 import app.diary.domain.diarySourceHash
+import app.diary.domain.extractiveDayBrief
 import app.diary.domain.summaryMaterialExists
 import app.diary.settings.AppSettings
 import kotlinx.coroutines.Dispatchers
@@ -62,10 +63,6 @@ class SummaryViewModel(
         viewModelScope.launch {
             try {
                 val key = settings.resolveApiKey()
-                if (key.isBlank()) {
-                    error = "小结以日记本上的一天卡片为准。这台设备没有另外的摘要密钥。"
-                    return@launch
-                }
                 val rows = repository.entriesForDay(dayKey)
                 val sources = rows.map { it.toSummarySource() }
                 if (!summaryMaterialExists(sources)) {
@@ -76,8 +73,19 @@ class SummaryViewModel(
                     }
                     return@launch
                 }
-                val prompt = buildSummaryPrompt(dayKey, sources)
-                val text = withContext(Dispatchers.IO) { deepSeek.summarize(key, prompt) }
+                val text = if (key.isNotBlank()) {
+                    try {
+                        withContext(Dispatchers.IO) { deepSeek.summarize(key, buildSummaryPrompt(dayKey, sources)) }
+                    } catch (thrown: Exception) {
+                        extractiveDayBrief(sources) ?: throw thrown
+                    }
+                } else {
+                    extractiveDayBrief(sources)
+                }
+                if (text.isNullOrBlank()) {
+                    error = "这一天还没有可以整理的文字。"
+                    return@launch
+                }
                 repository.saveSummary(dayKey, text, diarySourceHash(sources))
             } catch (thrown: Exception) {
                 error = thrown.message ?: "摘要没有生成"

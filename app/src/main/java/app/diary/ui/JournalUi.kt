@@ -53,6 +53,9 @@ fun DaySummaryCard(
     lines: List<String>,
     keywords: List<String>,
     mood: Int?,
+    actionLabel: String? = null,
+    actionBusy: Boolean = false,
+    onAction: (() -> Unit)? = null,
 ) {
     QuietCard {
         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -72,6 +75,11 @@ fun DaySummaryCard(
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
+            }
+            if (onAction != null && !actionLabel.isNullOrBlank()) {
+                TextButton(onClick = onAction, enabled = !actionBusy) {
+                    Text(if (actionBusy) "正在整理…" else actionLabel)
+                }
             }
         }
     }
