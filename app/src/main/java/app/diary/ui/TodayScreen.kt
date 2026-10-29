@@ -43,12 +43,12 @@ import app.diary.data.EntryWithPhotos
 import app.diary.data.PendingPhoto
 import app.diary.data.PhotoStore
 import app.diary.domain.CompanionVoice
-import app.diary.domain.DayBrief
 import app.diary.domain.DayClock
 import app.diary.domain.SummarySourceEntry
 import app.diary.domain.buildSummaryPrompt
 import app.diary.domain.dayBrief
 import app.diary.domain.diarySourceHash
+import app.diary.domain.extractiveDayBrief
 import app.diary.domain.summaryActionLabel
 import app.diary.domain.summaryCardVisible
 import app.diary.domain.summaryEmptyMessage
@@ -116,7 +116,6 @@ class DayWriterViewModel(
         private set
     var summarizing by mutableStateOf(false)
         private set
-    val hasLocalSummaryKey: Boolean = settings.resolveApiKey().isNotBlank()
 
     init {
         viewModelScope.launch {
@@ -125,31 +124,116 @@ class DayWriterViewModel(
                 uploadPhase = phase
                 if (phase is SyncPhase.Finished && !wasFinished) {
                     page = runCatching { withContext(Dispatchers.IO) { journal.load(dayKey) } }.getOrNull() ?: page
+                    ensureLocalSummary(manual = false)
                 }
             }
         }
     }
 
     fun refresh() {
-        connected = journal.configured()
-        if (!connected) {
-            page = null
-            linkNote = null
-            refreshing = false
-            return
-        }
+        if (refreshing) return
         refreshing = true
         viewModelScope.launch {
             try {
-                page = withContext(Dispatchers.IO) { journal.load(dayKey) }
-                linkNote = null
-            } catch (error: Exception) {
-                linkNote = error.message ?: "日记本没有连上"
+                reloadJournal()
+                ensureLocalSummary(manual = false)
             } finally {
                 refreshing = false
             }
         }
     }
+
+    fun prepareSummary() {
+        if (summarizing) return
+        viewModelScope.launch {
+            reloadJournal()
+            ensureLocalSummary(manual = true)
+        }
+    }
+
+    private suspend fun reloadJournal() {
+        connected = journal.configured()
+        if (!connected) {
+            page = null
+            linkNote = null
+            return
+        }
+        try {
+            page = withContext(Dispatchers.IO) { journal.load(dayKey) }
+            linkNote = null
+        } catch (error: Exception) {
+            linkNote = error.message ?: "日记本没有连上"
+        }
+    }
+
+    /**
+     * 打开这一天、或再点一次整理时：先看日记本有没有标题。
+     * 没有就用密钥生成；没有密钥或生成失败时，从当天原文摘几句。
+     */
+    private suspend fun ensureLocalSummary(manual: Boolean) {
+        if (summarizing) return
+        if (!serverHeadline().isNullOrEmpty()) {
+            if (manual) message = "日记本上已经有这一天的小结。"
+            return
+        }
+        if (!manual && !summary.value?.text.isNullOrBlank()) return
+        val sources = summarySources()
+        if (!summaryMaterialExists(sources)) {
+            if (manual) message = "这一天还没有可以整理的文字。"
+            return
+        }
+        summarizing = true
+        try {
+            val text = draftSummaryText(sources)
+            if (text.isNullOrBlank()) {
+                if (manual) message = "这一天还没有可以整理的文字。"
+                return
+            }
+            repository.saveSummary(dayKey, text, diarySourceHash(sources))
+            if (manual) message = "小结好了"
+        } catch (error: Exception) {
+            val fallback = extractiveDayBrief(sources)
+            if (!fallback.isNullOrBlank()) {
+                repository.saveSummary(dayKey, fallback, diarySourceHash(sources))
+                if (manual) message = "小结好了"
+            } else if (manual) {
+                message = error.message ?: "小结没有生成"
+            }
+        } finally {
+            summarizing = false
+        }
+    }
+
+    private suspend fun draftSummaryText(sources: List<SummarySourceEntry>): String? {
+        val key = settings.resolveApiKey()
+        if (key.isNotBlank()) {
+            return try {
+                withContext(Dispatchers.IO) { deepSeek.summarize(key, buildSummaryPrompt(dayKey, sources)) }
+            } catch (error: Exception) {
+                extractiveDayBrief(sources) ?: throw error
+            }
+        }
+        return extractiveDayBrief(sources)
+    }
+
+    private suspend fun summarySources(): List<SummarySourceEntry> {
+        val merged = ArrayList<SummarySourceEntry>()
+        val seen = HashSet<String>()
+        fun add(entry: SummarySourceEntry) {
+            val body = entry.body.trim()
+            val captions = entry.captions.map { it.trim() }.filter { it.isNotEmpty() }
+            if (body.isEmpty() && captions.isEmpty()) return
+            val key = body + "\u001f" + captions.joinToString("\u001f")
+            if (seen.add(key)) merged += SummarySourceEntry(body, captions)
+        }
+        repository.entriesForDay(dayKey).map { it.toSummarySource() }.forEach { add(it) }
+        page?.entries.orEmpty().forEach { entry ->
+            add(SummarySourceEntry(entry.content, emptyList()))
+        }
+        return merged
+    }
+
+    private fun serverHeadline(): String? = page?.card?.headline?.trim()?.takeIf { it.isNotEmpty() }
 
     fun save() {
         if (!hasContent()) {
@@ -222,67 +306,6 @@ class DayWriterViewModel(
         sync.start(announceIfEmpty = true)
     }
 
-    fun prepareSummary() {
-        if (summarizing) return
-        summarizing = true
-        viewModelScope.launch {
-            try {
-                connected = journal.configured()
-                if (connected) {
-                    try {
-                        page = withContext(Dispatchers.IO) { journal.load(dayKey) }
-                        linkNote = null
-                    } catch (error: Exception) {
-                        linkNote = error.message ?: "日记本没有连上"
-                    }
-                }
-                if (summaryCardVisible(currentBrief())) return@launch
-                val key = settings.resolveApiKey()
-                if (key.isBlank()) {
-                    message = if (DayClock.isToday(dayKey)) {
-                        "小结还没好。日记本一般在凌晨 4 点之后才收口。"
-                    } else {
-                        "日记本上还没有这一天的小结。"
-                    }
-                    return@launch
-                }
-                val rows = repository.entriesForDay(dayKey)
-                val localSources = rows.map { it.toSummarySource() }
-                val sources = if (summaryMaterialExists(localSources)) {
-                    localSources
-                } else {
-                    page?.entries.orEmpty().map { entry ->
-                        SummarySourceEntry(body = entry.content, captions = emptyList())
-                    }.filter { it.body.isNotBlank() }
-                }
-                if (!summaryMaterialExists(sources)) {
-                    message = "这一天还没有可以整理的文字。"
-                    return@launch
-                }
-                val prompt = buildSummaryPrompt(dayKey, sources)
-                val text = withContext(Dispatchers.IO) { deepSeek.summarize(key, prompt) }
-                repository.saveSummary(dayKey, text, diarySourceHash(sources))
-                message = "小结好了"
-            } catch (error: Exception) {
-                message = error.message ?: "小结没有生成"
-            } finally {
-                summarizing = false
-            }
-        }
-    }
-
-    private fun currentBrief(): DayBrief = dayBrief(
-        headline = page?.card?.headline,
-        moodLabel = page?.card?.moodLabel,
-        mood = page?.card?.mood,
-        keywords = page?.card?.keywords.orEmpty(),
-        companion = page?.card?.companion,
-        moodLine = page?.mood?.line,
-        localSummary = summary.value?.text,
-        entryTexts = page?.entries?.sortedBy { it.ts }?.map { it.content }.orEmpty(),
-        justSaved = presenceOverride,
-    )
-
     private fun notePresence(body: String, serverSpoke: Boolean) {
         val line = CompanionVoice.lineFor(body)
         if (line != null) presenceOverride = line
@@ -314,6 +337,7 @@ class DayWriterViewModel(
                 } else {
                     "记下了"
                 }
+                ensureLocalSummary(manual = false)
             } catch (error: Exception) {
                 message = error.message ?: "没有保存成功"
             } finally {
@@ -339,6 +363,7 @@ class DayWriterViewModel(
                         } else {
                             "记下了"
                         }
+                        ensureLocalSummary(manual = false)
                     }
                     is WriteOutcome.Partial -> {
                         val sent = snapshotPhotos.map { it.fileName }.toSet() -
@@ -352,6 +377,7 @@ class DayWriterViewModel(
                         page = runCatching { withContext(Dispatchers.IO) { journal.load(dayKey) } }.getOrNull() ?: page
                         notePresence(snapshotBody, serverSpoke())
                         message = "有一部分没送出去，先留在这台手机上。${outcome.error.message.orEmpty()}".trim()
+                        ensureLocalSummary(manual = false)
                     }
                 }
             } catch (error: Exception) {
@@ -360,6 +386,7 @@ class DayWriterViewModel(
                     clearDraft()
                     notePresence(snapshotBody, serverSpoke = false)
                     message = "没连上日记本，先记在这台手机上。"
+                    ensureLocalSummary(manual = false)
                 } catch (local: Exception) {
                     message = error.message ?: local.message ?: "没有保存成功"
                 }
@@ -562,6 +589,7 @@ fun WriterPage(
                 }
             }
             if (showSummary) {
+                val serverHeadline = page?.card?.headline?.trim().orEmpty()
                 item {
                     DiaryFrame {
                         DaySummaryCard(
@@ -569,26 +597,30 @@ fun WriterPage(
                             lines = brief.summaryLines,
                             keywords = brief.keywords,
                             mood = brief.mood,
+                            actionLabel = if (serverHeadline.isEmpty()) "再整理一次" else null,
+                            actionBusy = viewModel.summarizing,
+                            onAction = viewModel::prepareSummary,
                         )
                     }
                 }
             } else if (hasEntries) {
+                val drafting = viewModel.summarizing || viewModel.refreshing
                 item {
                     DiaryFrame {
                         SummaryEmptyCard(
                             title = summaryTitle,
-                            copy = summaryEmptyMessage(
-                                today = DayClock.isToday(viewModel.dayKey),
-                                connected = viewModel.connected,
-                                finalized = page?.card?.finalized == true,
-                                hasPresence = !presence.isNullOrBlank(),
-                            ),
-                            action = summaryActionLabel(
-                                today = DayClock.isToday(viewModel.dayKey),
-                                connected = viewModel.connected,
-                                canDraftLocally = viewModel.hasLocalSummaryKey,
-                            ),
-                            busy = viewModel.summarizing,
+                            copy = if (drafting) {
+                                "正在根据这一天写下的话整理小结。"
+                            } else {
+                                summaryEmptyMessage(
+                                    today = DayClock.isToday(viewModel.dayKey),
+                                    connected = viewModel.connected,
+                                    finalized = page?.card?.finalized == true,
+                                    hasPresence = !presence.isNullOrBlank(),
+                                )
+                            },
+                            action = summaryActionLabel(DayClock.isToday(viewModel.dayKey)),
+                            busy = drafting,
                             onAction = viewModel::prepareSummary,
                         )
                     }
